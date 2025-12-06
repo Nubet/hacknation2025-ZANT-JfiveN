@@ -365,7 +365,7 @@ const CaseDetails: React.FC = () => {
     }
 
     return (
-        <div className="w-full min-h-screen flex flex-col p-5 gap-5 bg-bg-main">
+        <div className="w-full min-h-screen flex flex-col gap-5 bg-bg-main pt-24">
             <ZantHeader step="Krok 2 - Szczegóły i dokumenty" />
 
             <div className="max-w-[2000px] w-[85vw] bg-bg-panel rounded-lg shadow-[0_2px_16px_rgba(0,0,0,0.08)] border border-border-light mx-auto p-6 flex flex-col gap-5">
@@ -551,7 +551,7 @@ const CaseDetails: React.FC = () => {
                                     <div className="font-bold text-[0.95rem] text-text-main">{doc.title}</div>
                                     <div className="text-[0.8rem] text-text-muted italic">{doc.meta}</div>
                                     <div
-                                        className="text-[0.85rem] text-[#333] bg-[#f9f9f9] border border-[#eee] p-[10px] max-h-[100px] overflow-hidden"
+                                        className="text-[0.85rem] text-[#333] bg-[#f9f9f9] border border-[#eee] p-[10px] max-h-[200px] overflow-auto"
                                         dangerouslySetInnerHTML={{ __html: doc.preview }}
                                     />
                                     <div className="mt-[5px] flex gap-[10px]">
