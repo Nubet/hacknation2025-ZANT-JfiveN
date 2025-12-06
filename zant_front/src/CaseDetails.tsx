@@ -277,7 +277,7 @@ W trakcie przenoszenia paczek poślizgnął się na mokrej, nieoznaczonej podło
 
     return (
         <div className="w-full min-h-screen flex flex-col p-5 gap-5 bg-transparent">
-            <ZantHeader step="Krok 2" />
+            <ZantHeader step="Krok 2 - Szczegóły i dokumenty" />
 
             <div className="max-w-[2000px] w-[85vw] bg-bg-panel rounded-lg shadow-[0_2px_16px_rgba(0,0,0,0.08)] border border-border-light mx-auto p-6 flex flex-col gap-5">
                 <div className="text-left mb-6 text-text-main text-[1.05rem] font-normal">

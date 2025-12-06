@@ -36,7 +36,7 @@ const AccidentReportForm: React.FC = () => {
 
     return (
         <div className="w-full min-h-screen flex flex-col p-[30px_15px] gap-[30px] font-['Open_Sans','Segoe_UI',Tahoma,Geneva,Verdana,sans-serif] bg-bg-main text-text-main text-base leading-normal">
-            <ZantHeader step="Krok 1" />
+            <ZantHeader step="Krok 1 - Twoje dane i opis wypadku" />
 
             <div className="max-w-[2000px] w-[85vw] bg-bg-panel rounded-lg shadow-[0_2px_16px_rgba(0,0,0,0.08)] border border-border mx-auto p-6 flex flex-col gap-5">
                 <div className="text-left mb-6 text-text-main text-[1.05rem] font-normal">
