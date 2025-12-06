@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ZantHeader from './ZantHeader';
+import { mockApi, isDevelopmentMode } from './mockApi';
+import type { InitialCaseRequest, InitialCaseResponse, ErrorResponse } from './mockApi';
 
 interface FormData {
     imie: string;
@@ -9,6 +11,7 @@ interface FormData {
     telefon: string;
     opis: string;
 }
+
 
 const AccidentReportForm: React.FC = () => {
     const navigate = useNavigate();
@@ -19,6 +22,8 @@ const AccidentReportForm: React.FC = () => {
         telefon: '',
         opis: ''
     });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -26,12 +31,82 @@ const AccidentReportForm: React.FC = () => {
             ...prev,
             [id]: value
         }));
+        // Clear error when user starts typing
+        if (error) setError(null);
     };
 
-    const handleSubmit = () => {
-        console.log('Form data submitted:', formData);
-        // Navigate to the second screen and pass formData in location state
-        navigate('/case/edit', { state: formData });
+    const handleSubmit = async () => {
+        // Validate required fields
+        if (!formData.imie.trim() || !formData.nazwisko.trim() || !formData.pesel.trim() || !formData.opis.trim()) {
+            setError('Proszę wypełnić wszystkie wymagane pola (Imię, Nazwisko, PESEL, Opis wypadku)');
+            return;
+        }
+
+        setIsSubmitting(true);
+        setError(null);
+
+        try {
+            // Prepare request according to OpenAPI spec
+            const requestBody: InitialCaseRequest = {
+                first_name: formData.imie,
+                last_name: formData.nazwisko,
+                pesel: formData.pesel,
+                description: formData.opis
+            };
+
+            // Add phone_number only if provided
+            if (formData.telefon.trim()) {
+                requestBody.phone_number = formData.telefon;
+            }
+
+            let data: InitialCaseResponse;
+
+            // Use mock API in development mode, real API in production
+            if (isDevelopmentMode()) {
+                console.log('[AccidentReportForm] Using mock API for development');
+                console.log('[AccidentReportForm] Request body:', requestBody);
+                data = await mockApi.initCase(requestBody);
+                console.log('[AccidentReportForm] Response:', data);
+            } else {
+                // Make API call to /api/cases/init
+                console.log('[AccidentReportForm] Using real API');
+                console.log('[AccidentReportForm] Request body:', requestBody);
+                const response = await fetch('/api/cases/init', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                console.log('[AccidentReportForm] Response status:', response.status);
+
+                if (!response.ok) {
+                    const errorData: ErrorResponse = await response.json();
+                    throw new Error(errorData.message || 'Wystąpił błąd podczas tworzenia sprawy');
+                }
+
+                data = await response.json();
+                console.log('[AccidentReportForm] Response data:', data);
+            }
+
+            console.log('[AccidentReportForm] Case created successfully:', data);
+            console.log('[AccidentReportForm] Navigating to:', `/case/edit/${data.caseId}`);
+
+            // Navigate to the second screen with the case ID
+            navigate(`/case/edit/${data.caseId}`, {
+                state: {
+                    caseId: data.caseId,
+                    createdAt: data.createdAt
+                }
+            });
+
+        } catch (err) {
+            console.error('Error submitting form:', err);
+            setError(err instanceof Error ? err.message : 'Wystąpił nieoczekiwany błąd. Spróbuj ponownie.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -125,6 +200,12 @@ const AccidentReportForm: React.FC = () => {
                             value={formData.opis}
                             onChange={handleInputChange}
                         />
+
+                        {error && (
+                            <div className="bg-red-50 border-l-4 border-status-error p-4 text-status-error text-sm">
+                                <strong>Błąd:</strong> {error}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex justify-between items-center p-[20px_30px] border-t border-border bg-[#f9f9f9] gap-5 flex-wrap">
@@ -133,10 +214,11 @@ const AccidentReportForm: React.FC = () => {
                             a następnie przełączysz się na drugi ekran z rozmową doprecyzowującą i podsumowaniem sprawy.
                         </div>
                         <button
-                            className="rounded border-none bg-secondary-main text-secondary-dark py-[10px] px-[30px] text-base font-bold cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-all duration-200 hover:bg-secondary-dark hover:-translate-y-px hover:shadow-[0_2px_5px_rgba(0,0,0,0.2)] hover:text-secondary-main"
+                            className="rounded border-none bg-secondary-main text-secondary-dark py-[10px] px-[30px] text-base font-bold cursor-pointer shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-all duration-200 hover:bg-secondary-dark hover:-translate-y-px hover:shadow-[0_2px_5px_rgba(0,0,0,0.2)] hover:text-secondary-main disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                             onClick={handleSubmit}
+                            disabled={isSubmitting}
                         >
-                            Wyślij dane i przejdź dalej
+                            {isSubmitting ? 'Wysyłanie...' : 'Wyślij dane i przejdź dalej'}
                         </button>
                     </div>
                 </section>

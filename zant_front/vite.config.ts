@@ -12,4 +12,13 @@ export default defineConfig({
     }),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080', // Change this to your backend URL
+        changeOrigin: true,
+        secure: false,
+      }
+    }
+  }
 })

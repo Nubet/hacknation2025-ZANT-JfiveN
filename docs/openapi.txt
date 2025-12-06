@@ -1,0 +1,398 @@
+openapi: 3.0.3
+info:
+  title: JfiveN – ZANT Accident Assistant API
+  version: 1.0.0
+  description: |
+    REST API for the JfiveN ZANT Incident Assistant (MVP).
+    Supports:
+    - Step 1: collecting basic personal data and raw accident narrative,
+    - Step 2: accident assistant with status panel and document previews.
+
+paths:
+
+  ##########################################
+  # CASE INITIALIZATION (STEP 1)
+  ##########################################
+
+  /api/cases/init:
+    post:
+      tags: [Cases]
+      summary: Initialize a new accident case
+      description: |
+        Creates a new accident case from basic personal data and a raw narrative
+        description of the accident. This endpoint is called from the first screen
+        where the user fills in their details and free-text description.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitialCaseRequest'
+      responses:
+        "201":
+          description: Case successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitialCaseResponse'
+        "400":
+          description: Invalid input data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  ##########################################
+  # CASE STATUS & DOCUMENTS (STEP 2)
+  ##########################################
+
+  /api/cases/{caseId}/status:
+    get:
+      tags: [Cases]
+      summary: Get current status of a case
+      description: |
+        Returns the current status of a case as displayed in the status panel:
+        - progress percentage,
+        - four legal definition elements (suddenness, external cause, injury, work relation),
+        - missing information,
+        - required documents,
+        - preliminary entitlement decision.
+      parameters:
+        - in: path
+          name: caseId
+          required: true
+          schema:
+            type: string
+          description: Identifier of the case (e.g. ZANT/2025/000123)
+      responses:
+        "200":
+          description: Case status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseStatusResponse'
+        "404":
+          description: Case not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/cases/{caseId}/documents:
+    get:
+      tags: [Cases]
+      summary: Get document previews for a case
+      description: |
+        Returns HTML previews for:
+        - accident notification,
+        - injured person explanation,
+        as well as an official summary text of the event.
+        Used to render the document cards on the second screen.
+      parameters:
+        - in: path
+          name: caseId
+          required: true
+          schema:
+            type: string
+          description: Identifier of the case (e.g. ZANT/2025/000123)
+      responses:
+        "200":
+          description: Document previews returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentsPreviewResponse'
+        "404":
+          description: Case not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  ##########################################
+  # CHAT (STEP 2 – ASSISTANT)
+  ##########################################
+
+  /api/cases/{caseId}/chat:
+    post:
+      tags: [Chat]
+      summary: Send a chat message for a case
+      description: |
+        Handles a single turn in the conversation for a given case.
+        The user message (and associated questionId) is used to update the
+        canonical case JSON and to recompute:
+        - definition status,
+        - missing information,
+        - preliminary entitlement decision,
+        - document previews.
+      parameters:
+        - in: path
+          name: caseId
+          required: true
+          schema:
+            type: string
+          description: Identifier of the case (e.g. ZANT/2025/000123)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        "200":
+          description: Chat turn processed and case updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        "400":
+          description: Invalid chat request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: Case not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+##########################################
+# COMPONENTS
+##########################################
+
+components:
+
+  schemas:
+
+    ##########################################
+    # CORE REQUEST/RESPONSE
+    ##########################################
+
+    InitialCaseRequest:
+      type: object
+      required: [first_name, last_name, pesel, description]
+      properties:
+        first_name:
+          type: string
+          description: Injured person's first name
+          example: Jan
+        last_name:
+          type: string
+          description: Injured person's last name
+          example: Kowalski
+        pesel:
+          type: string
+          description: Polish PESEL number of the injured person
+          example: "84010112345"
+        phone_number:
+          type: string
+          description: Contact phone number (optional)
+          example: "123456789"
+        description:
+          type: string
+          description: >
+            Free-text narrative of the accident, as the user would write it
+            in an email or statement.
+          example: >
+            Dnia 04.12.2025 r. około godziny 9:30, w magazynie podczas
+            przenoszenia kartonu poślizgnąłem się na mokrej podłodze...
+
+    InitialCaseResponse:
+      type: object
+      required: [caseId, createdAt]
+      properties:
+        caseId:
+          type: string
+          description: Generated case identifier
+          example: "ZANT/2025/000123"
+        createdAt:
+          type: string
+          format: date-time
+          description: Case creation timestamp
+
+    CaseStatusResponse:
+      type: object
+      required: [caseId, progressPercent, definition, missingInfo, entitlementDecision]
+      properties:
+        caseId:
+          type: string
+          description: Identifier of the case
+          example: "ZANT/2025/000123"
+        progressPercent:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+          description: Overall completeness of information for this case
+          example: 72
+        definition:
+          $ref: '#/components/schemas/DefinitionStatusSummary'
+        missingInfo:
+          $ref: '#/components/schemas/MissingInfoSummary'
+        entitlementDecision:
+          $ref: '#/components/schemas/EntitlementDecision'
+
+    DocumentsPreviewResponse:
+      type: object
+      required: [notificationHtml, explanationHtml, officialSummary]
+      properties:
+        notificationHtml:
+          type: string
+          description: HTML fragment with the accident notification draft
+          example: "<p>Zawiadamiam, że w dniu...</p>"
+        explanationHtml:
+          type: string
+          description: HTML fragment with the injured person's explanation draft
+          example: "<p>Wyjaśniam, że do zdarzenia doszło podczas...</p>"
+        officialSummary:
+          type: string
+          description: >
+            Concise, official-style summary of the event generated from
+            structured data and decision result.
+
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: User's chat message content
+          example: >
+            Tak, był świadek. Jan Nowak, mieszka w Krakowie przy ul. ...
+        questionId:
+          type: string
+          nullable: true
+          description: >
+            Identifier of the question being answered. Used to map the
+            message onto specific fields in the case JSON.
+          example: "witness_presence"
+
+    ChatResponse:
+      type: object
+      required: [assistantReply, nextQuestionId, caseStatus, missingInfo, documentsPreview]
+      properties:
+        assistantReply:
+          type: string
+          description: Assistant's natural language reply
+          example: >
+            Dziękuję, zanotowałem świadka Jana Nowaka. Podaj proszę nazwę
+            i adres placówki medycznej, która udzieliła Ci pierwszej pomocy.
+        nextQuestionId:
+          type: string
+          nullable: true
+          description: >
+            Identifier of the next question to be asked. May be null when
+            there are no further questions and the case is considered complete.
+          example: "medical_facility"
+        caseStatus:
+          $ref: '#/components/schemas/CaseStatusResponse'
+        missingInfo:
+          $ref: '#/components/schemas/MissingInfoSummary'
+        documentsPreview:
+          $ref: '#/components/schemas/DocumentsPreviewResponse'
+
+    ##########################################
+    # DEFINITION & DECISION
+    ##########################################
+
+    DefinitionStatusSummary:
+      type: object
+      required: [suddenness, externalCause, injury, workRelation]
+      properties:
+        suddenness:
+          $ref: '#/components/schemas/ElementStatus'
+        externalCause:
+          $ref: '#/components/schemas/ElementStatus'
+        injury:
+          $ref: '#/components/schemas/ElementStatus'
+        workRelation:
+          $ref: '#/components/schemas/ElementStatus'
+
+    ElementStatus:
+      type: object
+      required: [status, explanation]
+      properties:
+        status:
+          type: string
+          description: Status of this element of the accident definition
+          enum: [EMPTY, PARTIAL, COMPLETE]
+          example: PARTIAL
+        explanation:
+          type: string
+          description: Short explanation of why this status was assigned
+          example: "Data podana, brak dokładnej godziny zdarzenia."
+
+    MissingInfoSummary:
+      type: object
+      required: [requiredMissing, recommendedMissing, documentsNeeded]
+      properties:
+        requiredMissing:
+          type: array
+          description: List of critical missing information items
+          items:
+            type: string
+          example:
+            - "Witness data (name and address)"
+            - "Name and address of medical facility"
+        recommendedMissing:
+          type: array
+          description: List of optional but recommended information items
+          items:
+            type: string
+          example:
+            - "Exact description of task performed immediately before the accident"
+        documentsNeeded:
+          type: array
+          description: List of document types that should be prepared
+          items:
+            type: string
+          example:
+            - "Medical documentation confirming injury"
+            - "Police note if it was a traffic accident"
+
+    EntitlementDecision:
+      type: object
+      required: [result, reasonCodes, shortExplanation]
+      properties:
+        result:
+          type: string
+          description: Preliminary assessment of entitlement to accident benefit
+          enum: [ELIGIBLE, PROBABLY_ELIGIBLE, UNCLEAR, PROBABLY_NOT_ELIGIBLE]
+          example: PROBABLY_ELIGIBLE
+        reasonCodes:
+          type: array
+          description: Machine-readable codes for reasons behind the result
+          items:
+            type: string
+          example:
+            - "ALL_FOUR_ELEMENTS_PROBABLY_MET"
+        shortExplanation:
+          type: string
+          description: Human-readable explanation summarising the decision
+          example: >
+            Opis wskazuje na nagłe zdarzenie z przyczyną zewnętrzną i urazem
+            podczas wykonywania działalności.
+
+    ##########################################
+    # ERROR HANDLING
+    ##########################################
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Application-specific error code
+          example: "CASE_NOT_FOUND"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Case with given id does not exist."
+        details:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Optional structured details about the error

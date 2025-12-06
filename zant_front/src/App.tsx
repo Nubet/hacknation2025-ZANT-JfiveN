@@ -7,7 +7,7 @@ const App: React.FC = () => {
     return (
         <Routes>
             <Route path="/case/create" element={<AccidentReportForm />} />
-            <Route path="/case/edit" element={<CaseDetails />} />
+            <Route path="/case/edit/*" element={<CaseDetails />} />
             <Route path="/" element={<Navigate to="/case/create" replace />} />
         </Routes>
     );
