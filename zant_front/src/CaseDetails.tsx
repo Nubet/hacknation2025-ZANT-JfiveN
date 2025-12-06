@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import './CaseDetails.css';
 import ZantHeader from './ZantHeader';
 
 // Types for the case data
@@ -240,9 +239,9 @@ W trakcie przenoszenia paczek poślizgnął się na mokrej, nieoznaczonej podło
 
     const getStatusClass = (status: string) => {
         switch (status) {
-            case 'complete': return 'status-complete';
-            case 'partial': return 'status-partial';
-            case 'missing': return 'status-error';
+            case 'complete': return 'bg-status-success';
+            case 'partial': return 'bg-status-warning';
+            case 'missing': return 'bg-status-error';
             default: return '';
         }
     };
@@ -256,41 +255,63 @@ W trakcie przenoszenia paczek poślizgnął się na mokrej, nieoznaczonej podło
         }
     };
 
+    const getItemClass = (type: string) => {
+        switch (type) {
+            case 'required': return 'text-status-error';
+            case 'recommended': return 'text-status-warning';
+            default: return 'text-text-main';
+        }
+    };
+
+    const getBulletClass = (type: string) => {
+        switch (type) {
+            case 'required': return 'bg-status-error';
+            case 'recommended': return 'bg-status-warning';
+            default: return 'bg-[#999]';
+        }
+    };
+
     if (isLoading) {
-        return <div className="loading">Ładowanie...</div>;
+        return <div className="flex justify-center items-center min-h-screen text-[1.2rem] text-text-muted">Ładowanie...</div>;
     }
 
     return (
-        <div className="app-shell">
-            <ZantHeader step="Krok 2 - Szczególy i dokumenty" />
+        <div className="w-full min-h-screen flex flex-col p-5 gap-5 bg-transparent">
+            <ZantHeader step="Krok 2" />
 
-            <div className="main-window">
-                <div className="page-subtitle" style={{ textAlign: 'left', marginBottom: 24, color: '#333', fontSize: '1.05rem', fontWeight: 400 }}>
+            <div className="max-w-[2000px] w-[85vw] bg-bg-panel rounded-lg shadow-[0_2px_16px_rgba(0,0,0,0.08)] border border-border-light mx-auto p-6 flex flex-col gap-5">
+                <div className="text-left mb-6 text-text-main text-[1.05rem] font-normal">
                     Na tym etapie prosimy o uzupełnienie szczegółowych informacji dotyczących wypadku oraz przygotowanie wymaganych dokumentów. System na podstawie podanych danych wygeneruje projekty dokumentów do zgłoszenia wypadku przy pracy.
                 </div>
 
-                <div className="screen-label">{caseData.screenLabel}</div>
+                <div className="text-base font-bold text-text-main pl-[5px] border-l-4 border-primary-dark leading-none mb-[10px]">{caseData.screenLabel}</div>
 
-                <main className="main-layout">
-                    <section className="chat-shell">
-                        <div className="chat-header">
-                            <div className="chat-title">{caseData.chatTitle}</div>
-                            <div className="chat-subtitle">{caseData.chatSubtitle}</div>
+                <main className="flex gap-[30px] flex-1 min-h-0 max-[960px]:flex-col">
+                    <section className="flex-[3] bg-bg-panel flex flex-col shadow-[0_1px_3px_rgba(0,0,0,0.12)] border border-border-light min-h-[400px]">
+                        <div className="py-[15px] px-5 bg-[#fcfcfc] border-b border-border-light">
+                            <div className="text-[1.1rem] font-semibold text-text-main">{caseData.chatTitle}</div>
+                            <div className="text-[0.85rem] text-text-muted">{caseData.chatSubtitle}</div>
                         </div>
-                        <div className="chat-history">
+                        <div className="flex-1 p-5 overflow-y-auto flex flex-col gap-[15px] bg-white">
                             {caseData.messages.map((msg) => (
                                 <React.Fragment key={msg.id}>
-                                    <div className={`msg-row ${msg.type}`}>
-                                        <div className={`msg-bubble ${msg.type}`}>
+                                    <div className={`flex w-full ${msg.type === 'assistant' ? 'justify-start' : msg.type === 'user' ? 'justify-end' : 'justify-center'}`}>
+                                        <div className={`max-w-[85%] py-3 px-4 rounded-none text-[0.95rem] leading-normal
+                                            ${msg.type === 'assistant' ? 'bg-bubble-assistant border-l-[3px] border-primary-dark text-text-main' : ''}
+                                            ${msg.type === 'user' ? 'bg-bubble-user text-bubble-user-text border border-[#d0e0dc]' : ''}
+                                            ${msg.type === 'system' ? 'bg-white text-text-muted text-[0.85rem] italic border border-dashed border-border-light text-center' : ''}`}>
                                             {msg.type === 'assistant' ? (
                                                 <>
                                                     <div dangerouslySetInnerHTML={{ __html: msg.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>') }} />
                                                     {msg.quickActions && (
-                                                        <div className="quick-actions">
+                                                        <div className="mt-[10px] flex flex-wrap gap-2">
                                                             {msg.quickActions.map((action, idx) => (
                                                                 <button
                                                                     key={idx}
-                                                                    className={`quick-button ${action.isPrimary ? 'primary' : ''}`}
+                                                                    className={`rounded border py-1.5 px-3 text-[0.85rem] cursor-pointer transition-all duration-200
+                                                                        ${action.isPrimary 
+                                                                            ? 'border-primary-main text-primary-main bg-primary-light font-semibold' 
+                                                                            : 'border-border-light bg-white text-text-main hover:bg-[#f2f2f2] hover:border-[#999]'}`}
                                                                     onClick={() => handleQuickAction(action)}
                                                                 >
                                                                     {action.label}
@@ -305,7 +326,7 @@ W trakcie przenoszenia paczek poślizgnął się na mokrej, nieoznaczonej podło
                                         </div>
                                     </div>
                                     {msg.timestamp && (
-                                        <div className={`msg-meta ${msg.type}`}>
+                                        <div className={`mt-1 text-[0.75rem] text-text-muted font-semibold ${msg.type === 'assistant' ? 'ml-1' : 'text-right mr-1'}`}>
                                             {msg.type === 'assistant' ? 'Asystent ZANT' : 'Ty'} · {msg.timestamp}
                                         </div>
                                     )}
@@ -313,13 +334,13 @@ W trakcie przenoszenia paczek poślizgnął się na mokrej, nieoznaczonej podło
                             ))}
                         </div>
 
-                        <div className="chat-input-shell">
-                            <div className="chat-input-label">
+                        <div className="border-t border-border-light py-[15px] px-5 bg-[#f9f9f9] flex flex-col gap-[10px]">
+                            <div className="text-[0.85rem] text-text-muted">
                                 Aktualne pytanie: <strong>{caseData.currentQuestion}</strong>
                             </div>
-                            <div className="chat-input-row">
+                            <div className="flex gap-[10px]">
                                 <textarea
-                                    className="chat-input"
+                                    className="flex-1 rounded-none border border-border-light p-[10px] text-base outline-none bg-white min-h-[50px] resize-y font-[inherit] focus:border-primary-main focus:shadow-[0_0_0_1px_var(--color-primary-main)]"
                                     placeholder="Np. Tak, był świadek – Jan Nowak, współpracownik obecny w magazynie..."
                                     value={inputValue}
                                     onChange={(e) => setInputValue(e.target.value)}
@@ -331,60 +352,63 @@ W trakcie przenoszenia paczek poślizgnął się na mokrej, nieoznaczonej podło
                                     }}
                                 />
                             </div>
-                            <button className="chat-send" onClick={handleSendMessage}>
+                            <button
+                                className="rounded border-none bg-secondary-main text-secondary-dark px-6 py-0 text-base font-bold cursor-pointer self-end h-10 mt-[5px] transition-colors duration-200 hover:bg-secondary-dark hover:text-secondary-main"
+                                onClick={handleSendMessage}
+                            >
                                 Wyślij odpowiedź
                             </button>
                         </div>
                     </section>
 
-                    <aside className="status-panel">
+                    <aside className="flex-[2] bg-bg-panel p-5 shadow-[0_1px_3px_rgba(0,0,0,0.12)] border border-border-light flex flex-col gap-5 max-[960px]:order-[-1]">
                         <div>
-                            <div className="status-header-title">{caseData.statusTitle} {caseData.caseId}</div>
-                            <div className="status-header-subtitle">{caseData.statusSubtitle}</div>
-                            <div className="progress-shell">
-                                <div className="progress-label">
+                            <div className="text-[1.1rem] font-semibold text-primary-main">{caseData.statusTitle} {caseData.caseId}</div>
+                            <div className="text-[0.85rem] text-text-muted">{caseData.statusSubtitle}</div>
+                            <div className="mt-2">
+                                <div className="flex justify-between text-[0.8rem] text-text-main font-semibold mb-[5px]">
                                     <span>Postęp informacji</span>
                                     <span>{caseData.progress}%</span>
                                 </div>
-                                <div className="progress-bar">
-                                    <div className="progress-bar-fill" style={{ width: `${caseData.progress}%` }} />
+                                <div className="w-full h-[10px] bg-[#e9ecef] rounded-none">
+                                    <div className="h-full bg-primary-main" style={{ width: `${caseData.progress}%` }} />
                                 </div>
                             </div>
                         </div>
 
                         <div>
-                            <div className="section-title">Definicja wypadku przy pracy</div>
-                            <div className="definition-grid">
+                            <div className="text-[0.95rem] font-bold mb-2 text-text-main border-b border-border-light pb-1">Definicja wypadku przy pracy</div>
+                            <div className="grid grid-cols-2 gap-[10px]">
                                 {caseData.definitions.map((def, idx) => (
-                                    <div className="definition-card" key={idx}>
-                                        <div className="definition-title">{def.title}</div>
-                                        <span className={`definition-status-pill ${getStatusClass(def.status)}`}>
+                                    <div className="border border-border-light p-[10px] flex flex-col gap-[5px] bg-white" key={idx}>
+                                        <div className="font-semibold text-[0.85rem] text-text-main">{def.title}</div>
+                                        <span className={`self-start py-[2px] px-1.5 text-[0.75rem] font-semibold text-white ${getStatusClass(def.status)}`}>
                                             {getStatusLabel(def.status)}
                                         </span>
-                                        <div className="definition-note">{def.note}</div>
+                                        <div className="text-[0.75rem] text-text-muted mt-[2px]">{def.note}</div>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        <div className="section-block">
-                            <div className="section-title">Informacje wymagane</div>
-                            <ul className="section-list">
+                        <div className="mt-[10px]">
+                            <div className="text-[0.95rem] font-bold mb-2 text-text-main border-b border-border-light pb-1">Informacje wymagane</div>
+                            <ul className="list-none p-0 m-0 flex flex-col gap-2">
                                 {caseData.requiredInfos.map((info, idx) => (
-                                    <li className={`section-item ${info.type}`} key={idx}>
-                                        <span className="section-bullet" />
+                                    <li className={`text-[0.85rem] flex gap-2 items-start ${getItemClass(info.type)}`} key={idx}>
+                                        <span className={`w-2 h-2 mt-1.5 shrink-0 ${getBulletClass(info.type)}`} />
                                         <span>{info.text}</span>
                                     </li>
                                 ))}
                             </ul>
                         </div>
 
-                        <div className="section-block">
-                            <div className="section-title">Dokumenty do przygotowania</div>
-                            <ul className="section-list">
+                        <div className="mt-[10px]">
+                            <div className="text-[0.95rem] font-bold mb-2 text-text-main border-b border-border-light pb-1">Dokumenty do przygotowania</div>
+                            <ul className="list-none p-0 m-0 flex flex-col gap-2">
                                 {caseData.documentsToPrep.map((doc, idx) => (
-                                    <li className={`section-item ${doc.type}`} key={idx}>
-                                        <span className="section-bullet" />
+                                    <li className={`text-[0.85rem] flex gap-2 items-start ${getItemClass(doc.type)}`} key={idx}>
+                                        <span className={`w-2 h-2 mt-1.5 shrink-0 ${getBulletClass(doc.type)}`} />
                                         <span>{doc.text}</span>
                                     </li>
                                 ))}
@@ -393,14 +417,17 @@ W trakcie przenoszenia paczek poślizgnął się na mokrej, nieoznaczonej podło
                     </aside>
                 </main>
 
-                <section className="documents-shell">
-                    <div className="documents-header">
-                        <div className="documents-title">Projekty dokumentów</div>
-                        <div className="tab-bar">
+                <section className="bg-bg-panel p-5 shadow-[0_1px_3px_rgba(0,0,0,0.12)] border border-border-light flex flex-col gap-[15px] mt-[10px]">
+                    <div className="flex justify-between items-center border-b border-border-light pb-[10px]">
+                        <div className="text-[1.1rem] font-semibold text-primary-main">Projekty dokumentów</div>
+                        <div className="inline-flex gap-[2px]">
                             {caseData.documents.map((doc) => (
                                 <button
                                     key={doc.id}
-                                    className={`tab-button ${caseData.activeTab === doc.title ? 'active' : ''}`}
+                                    className={`py-2 px-4 border border-transparent bg-transparent cursor-pointer font-semibold border-b-[3px]
+                                        ${caseData.activeTab === doc.title 
+                                            ? 'text-primary-main border-b-primary-main' 
+                                            : 'text-text-muted border-b-transparent'}`}
                                     onClick={() => handleTabChange(doc.title)}
                                 >
                                     {doc.title}
@@ -408,23 +435,23 @@ W trakcie przenoszenia paczek poślizgnął się na mokrej, nieoznaczonej podło
                             ))}
                         </div>
                     </div>
-                    <div className="documents-grid">
+                    <div className="grid grid-cols-2 gap-5 max-[640px]:grid-cols-1">
                         {caseData.documents.map((doc) => (
-                            <div className="document-card" key={doc.id}>
-                                <div className="document-title">{doc.title}</div>
-                                <div className="document-meta">{doc.meta}</div>
+                            <div className="border border-border-light p-[15px] bg-white flex flex-col gap-[10px]" key={doc.id}>
+                                <div className="font-bold text-[0.95rem] text-text-main">{doc.title}</div>
+                                <div className="text-[0.8rem] text-text-muted italic">{doc.meta}</div>
                                 <div
-                                    className="document-body-preview"
+                                    className="text-[0.85rem] text-[#333] bg-[#f9f9f9] border border-[#eee] p-[10px] max-h-[100px] overflow-hidden"
                                     dangerouslySetInnerHTML={{ __html: doc.preview }}
                                 />
-                                <div className="document-actions">
-                                    <button className="doc-button primary">Pobierz jako PDF</button>
-                                    <button className="doc-button">Pobierz jako .docx</button>
+                                <div className="mt-[5px] flex gap-[10px]">
+                                    <button className="rounded border border-secondary-main bg-secondary-main text-secondary-dark py-1.5 px-3.5 text-[0.8rem] cursor-pointer font-semibold hover:bg-secondary-dark hover:text-secondary-main transition-colors duration-200">Pobierz jako PDF</button>
+                                    <button className="rounded border border-border-light bg-white text-text-main py-1.5 px-3.5 text-[0.8rem] cursor-pointer font-semibold">Pobierz jako .docx</button>
                                 </div>
                             </div>
                         ))}
                     </div>
-                    <div className="document-meta" style={{ marginTop: '10px' }}>
+                    <div className="text-[0.8rem] text-text-muted italic mt-[10px]">
                         {caseData.footerNote}
                     </div>
                 </section>

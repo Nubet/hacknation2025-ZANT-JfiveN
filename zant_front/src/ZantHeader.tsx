@@ -5,12 +5,12 @@ interface ZantHeaderProps {
 }
 
 const ZantHeader: React.FC<ZantHeaderProps> = ({ step }) => (
-    <header className="app-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', padding: '20px 0', borderBottom: '2px solid #006b4f', marginBottom: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <img src="/images.png" alt="ZANT Logo" style={{ height: 48 }} />
-            <span style={{ fontWeight: 700, fontSize: '1.7rem', color: '#006b4f', marginLeft: 8 }}>Asystent zgłoszenia ZANT</span>
+    <header className="flex items-center justify-between bg-white py-5 border-b-2 border-primary-main mb-0">
+        <div className="flex items-center gap-4">
+            <img src="/images.png" alt="ZANT Logo" className="h-12" />
+            <span className="font-bold text-[1.7rem] text-primary-main ml-2">Asystent zgłoszenia ZANT</span>
         </div>
-        <div style={{ background: '#006b4f', color: '#fff', borderRadius: 6, padding: '6px 18px', fontWeight: 600, fontSize: '1rem', minWidth: 90, textAlign: 'center' }}>
+        <div className="bg-primary-main text-white rounded-md px-[18px] py-1.5 font-semibold text-base min-w-[90px] text-center">
             {step}
         </div>
     </header>

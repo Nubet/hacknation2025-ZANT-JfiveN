@@ -1,25 +1,31 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap');
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+@theme {
+  --color-primary-main: #006b4f;
+  --color-primary-dark: #004d39;
+  --color-primary-light: #e6f0ed;
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  --color-secondary-main: #fab856;
+  --color-secondary-dark: #00416e;
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+  --color-bg-main: #f5f6f8;
+  --color-bg-panel: #ffffff;
+
+  --color-border: #cccccc;
+  --color-border-light: #dddddd;
+
+  --color-text-main: #333333;
+  --color-text-light: #666666;
+  --color-text-muted: #666666;
+
+  --color-status-success: #5cb85c;
+  --color-status-warning: #f0ad4e;
+  --color-status-error: #d9534f;
+
+  --color-bubble-assistant: #f5f6f8;
+  --color-bubble-user: #e6f0ed;
+  --color-bubble-user-text: #004d39;
 }
 
 html, body, #root {
@@ -29,46 +35,12 @@ html, body, #root {
 
 body {
   margin: 0;
-  display: block; /* allow components to manage layout */
+  font-family: 'Open Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #f5f6f8; /* site background (gray) */
+  background-color: #f5f6f8;
   -webkit-font-smoothing: antialiased;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+  color: #333333;
+  font-size: 16px;
+  line-height: 1.5;
 }
