@@ -101,9 +101,14 @@ console.log('[API Client] Using API base URL:', API_BASE_URL);
 // ==========================================
 
 class ApiError extends Error {
-    constructor(public code: string, message: string, public details?: Record<string, unknown> | null) {
+    code: string;
+    details?: Record<string, unknown> | null;
+
+    constructor(code: string, message: string, details?: Record<string, unknown> | null) {
         super(message);
         this.name = 'ApiError';
+        this.code = code;
+        this.details = details;
     }
 }
 
