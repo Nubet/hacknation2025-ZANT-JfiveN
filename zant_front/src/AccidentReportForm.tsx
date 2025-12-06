@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ZantHeader from './ZantHeader';
-import { mockApi, isDevelopmentMode } from './mockApi';
-import type { InitialCaseRequest, InitialCaseResponse, ErrorResponse } from './mockApi';
+import { api, ApiError } from './apiClient';
+import type { InitialCaseRequest } from './apiClient';
 
 interface FormData {
     imie: string;
@@ -59,36 +59,9 @@ const AccidentReportForm: React.FC = () => {
                 requestBody.phone_number = formData.telefon;
             }
 
-            let data: InitialCaseResponse;
-
-            // Use mock API in development mode, real API in production
-            if (isDevelopmentMode()) {
-                console.log('[AccidentReportForm] Using mock API for development');
-                console.log('[AccidentReportForm] Request body:', requestBody);
-                data = await mockApi.initCase(requestBody);
-                console.log('[AccidentReportForm] Response:', data);
-            } else {
-                // Make API call to /api/cases/init
-                console.log('[AccidentReportForm] Using real API');
-                console.log('[AccidentReportForm] Request body:', requestBody);
-                const response = await fetch('/api/cases/init', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-
-                console.log('[AccidentReportForm] Response status:', response.status);
-
-                if (!response.ok) {
-                    const errorData: ErrorResponse = await response.json();
-                    throw new Error(errorData.message || 'Wystąpił błąd podczas tworzenia sprawy');
-                }
-
-                data = await response.json();
-                console.log('[AccidentReportForm] Response data:', data);
-            }
+            console.log('[AccidentReportForm] Request body:', requestBody);
+            const data = await api.initCase(requestBody);
+            console.log('[AccidentReportForm] Response:', data);
 
             console.log('[AccidentReportForm] Case created successfully:', data);
             console.log('[AccidentReportForm] Navigating to:', `/case/edit/${data.caseId}`);
@@ -103,7 +76,11 @@ const AccidentReportForm: React.FC = () => {
 
         } catch (err) {
             console.error('Error submitting form:', err);
-            setError(err instanceof Error ? err.message : 'Wystąpił nieoczekiwany błąd. Spróbuj ponownie.');
+            if (err instanceof ApiError) {
+                setError(err.message);
+            } else {
+                setError(err instanceof Error ? err.message : 'Wystąpił nieoczekiwany błąd. Spróbuj ponownie.');
+            }
         } finally {
             setIsSubmitting(false);
         }

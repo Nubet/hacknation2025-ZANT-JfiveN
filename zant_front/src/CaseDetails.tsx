@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import ZantHeader from './ZantHeader';
-import { mockApi, isDevelopmentMode } from './mockApi';
+import { api, ApiError } from './apiClient';
 import type {
     CaseStatusResponse,
     DocumentsPreviewResponse,
-    ChatMessage,
-    ChatResponse
-} from './mockApi';
+    ChatMessage
+} from './apiClient';
 
 // Types for the case data
 interface QuickAction {
@@ -190,56 +189,31 @@ const CaseDetails: React.FC = () => {
             setError(null);
 
             try {
-                if (isDevelopmentMode()) {
-                    console.log('[CaseDetails] Using mock API for development');
+                console.log('[CaseDetails] Fetching case data from API');
 
-                    // Fetch all data in parallel
-                    const [statusData, docsData, chatData] = await Promise.all([
-                        mockApi.getCaseStatus(caseId),
-                        mockApi.getDocuments(caseId),
-                        mockApi.getChatHistory(caseId)
-                    ]);
+                // Fetch all data in parallel
+                const [statusData, docsData, chatData] = await Promise.all([
+                    api.getCaseStatus(caseId),
+                    api.getDocuments(caseId),
+                    api.getChatHistory(caseId)
+                ]);
 
-                    console.log('[CaseDetails] Status response:', statusData);
-                    console.log('[CaseDetails] Documents response:', docsData);
-                    console.log('[CaseDetails] Chat history response:', chatData);
+                console.log('[CaseDetails] Status response:', statusData);
+                console.log('[CaseDetails] Documents response:', docsData);
+                console.log('[CaseDetails] Chat history response:', chatData);
 
-                    processStatusResponse(statusData);
-                    processDocumentsResponse(docsData);
-                    processChatHistory(chatData.messages, chatData.currentQuestionId);
+                processStatusResponse(statusData);
+                processDocumentsResponse(docsData);
+                processChatHistory(chatData.messages, chatData.currentQuestionId);
 
-                    console.log('[CaseDetails] State updated successfully');
-                } else {
-                    // Real API calls
-                    console.log('[CaseDetails] Using real API');
-
-                    const [statusRes, docsRes] = await Promise.all([
-                        fetch(`/api/cases/${encodeURIComponent(caseId)}/status`),
-                        fetch(`/api/cases/${encodeURIComponent(caseId)}/documents`)
-                    ]);
-
-                    console.log('[CaseDetails] Status response status:', statusRes.status);
-                    console.log('[CaseDetails] Documents response status:', docsRes.status);
-
-                    if (!statusRes.ok) {
-                        throw new Error('Nie udało się pobrać statusu sprawy');
-                    }
-                    if (!docsRes.ok) {
-                        throw new Error('Nie udało się pobrać dokumentów');
-                    }
-
-                    const statusData: CaseStatusResponse = await statusRes.json();
-                    const docsData: DocumentsPreviewResponse = await docsRes.json();
-
-                    console.log('[CaseDetails] Status data:', statusData);
-                    console.log('[CaseDetails] Documents data:', docsData);
-
-                    processStatusResponse(statusData);
-                    processDocumentsResponse(docsData);
-                }
+                console.log('[CaseDetails] State updated successfully');
             } catch (err) {
                 console.error('[CaseDetails] Error fetching case data:', err);
-                setError(err instanceof Error ? err.message : 'Wystąpił błąd podczas pobierania danych sprawy');
+                if (err instanceof ApiError) {
+                    setError(err.message);
+                } else {
+                    setError(err instanceof Error ? err.message : 'Wystąpił błąd podczas pobierania danych sprawy');
+                }
             } finally {
                 setIsLoading(false);
             }
@@ -267,35 +241,12 @@ const CaseDetails: React.FC = () => {
         setIsSending(true);
 
         try {
-            let response: ChatResponse;
-
-            if (isDevelopmentMode()) {
-                console.log('[CaseDetails] Sending message via mock API');
-                response = await mockApi.sendChatMessage(caseId, {
-                    message: text,
-                    questionId: questionId || currentQuestionId || null
-                });
-                console.log('[CaseDetails] Chat response:', response);
-            } else {
-                console.log('[CaseDetails] Sending message via real API');
-                const res = await fetch(`/api/cases/${encodeURIComponent(caseId)}/chat`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: text,
-                        questionId: questionId || currentQuestionId || null
-                    })
-                });
-
-                console.log('[CaseDetails] Chat response status:', res.status);
-
-                if (!res.ok) {
-                    throw new Error('Nie udało się wysłać wiadomości');
-                }
-
-                response = await res.json();
-                console.log('[CaseDetails] Chat response data:', response);
-            }
+            console.log('[CaseDetails] Sending message via API');
+            const response = await api.sendChatMessage(caseId, {
+                message: text,
+                questionId: questionId || currentQuestionId || null
+            });
+            console.log('[CaseDetails] Chat response:', response);
 
             // Add assistant message
             const assistantMessage: Message = {
