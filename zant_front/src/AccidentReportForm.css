@@ -16,14 +16,17 @@
     --radius-btn: 4px;
     --radius-input: 0px;
     --radius-panel: 0px;
+
+    /* Page gutter: left/right margins for main window */
+    --page-gutter: 24px; /* halved */
 }
 
 * { box-sizing: border-box; }
 
 .app-shell {
-    max-width: 1280px;
+    width: 100%;
     margin: 0 auto;
-    min-height: 100vh;
+    min-height: 100%;
     display: flex;
     flex-direction: column;
     padding: 30px 15px;
@@ -250,19 +253,20 @@
     color: #fab856;
 }
 
-@media (max-width: 768px) {
-    .grid-2 {
-        grid-template-columns: minmax(0, 1fr);
-    }
-    .footer-row {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .hint {
-        max-width: 100%;
-        margin-bottom: 10px;
-    }
-    .primary-btn {
-        width: 100%;
-    }
+.main-window {
+    max-width: 2000px;
+    width: 85vw;
+    background: var(--bg-panel);
+    border-radius: 8px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    border: 1px solid var(--border-color);
+    margin: 24px auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
+
+
+
+
