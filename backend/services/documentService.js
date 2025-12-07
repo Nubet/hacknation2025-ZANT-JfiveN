@@ -3,14 +3,6 @@
  * Generates HTML previews for notification and explanation documents
  */
 
-/**
- * Generate all document previews
- * @param {Object} caseData - Full case data
- * @param {Object} extractedData - Extracted structured data
- * @param {Object} definitionStatus - Current definition status
- * @param {Boolean} includeOpinion - Whether to include opinion document (only for employees)
- * @returns {Object} DocumentsPreviewResponse
- */
 export function generateDocuments(caseData, extractedData, definitionStatus, includeOpinion = false) {
     const docs = {
         notificationHtml: generateNotificationHtml(caseData, extractedData),
@@ -26,9 +18,6 @@ export function generateDocuments(caseData, extractedData, definitionStatus, inc
     return docs;
 }
 
-/**
- * Common styles for all documents - matching ZANT UI design system
- */
 const documentStyles = `
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap');
@@ -642,9 +631,6 @@ function formatPolishDate(dateStr) {
     }
 }
 
-/**
- * Generate opinion HTML document for accident qualification
- */
 function generateOpinionHtml(caseData, extractedData, definitionStatus) {
     const accident = extractedData?.accident || {};
     const injury = extractedData?.injury || {};
