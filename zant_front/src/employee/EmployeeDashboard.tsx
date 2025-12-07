@@ -66,8 +66,6 @@ const EmployeeDashboard = () => {
   // Extract person name from chat history if available
   const getPersonName = (): string => {
     if (!caseData?.chatHistory) return 'Jan Kowalski';
-    // Try to find name in chat messages (this is a simple heuristic)
-    const userMessages = caseData.chatHistory.filter(m => m.type === 'user');
     // For now, return default - in real app you'd extract from form data
     return 'Poszkodowany';
   };
