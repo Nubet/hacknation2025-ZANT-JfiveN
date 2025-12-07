@@ -54,6 +54,7 @@ export interface DocumentsPreviewResponse {
     notificationHtml: string;
     explanationHtml: string;
     officialSummary: string;
+    opinionHtml?: string; // Optional - only for employee view
 }
 
 export interface ChatRequest {
@@ -159,7 +160,7 @@ export const api = {
         return data;
     },
 
-    // GET /api/cases/{caseId}/documents
+    // GET /api/cases/{caseId}/documents (user view - without opinion)
     getDocuments: async (caseId: string): Promise<DocumentsPreviewResponse> => {
         console.log('[API Client] GET /api/cases/:caseId/documents', caseId);
 
@@ -172,6 +173,22 @@ export const api = {
 
         const data = await handleResponse<DocumentsPreviewResponse>(response);
         console.log('[API Client] Response:', data);
+        return data;
+    },
+
+    // GET /api/cases/{caseId}/documents/employee (employee view - with opinion)
+    getEmployeeDocuments: async (caseId: string): Promise<DocumentsPreviewResponse> => {
+        console.log('[API Client] GET /api/cases/:caseId/documents/employee', caseId);
+
+        const response = await fetch(`${API_BASE_URL}/cases/${encodeURIComponent(caseId)}/documents/employee`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const data = await handleResponse<DocumentsPreviewResponse>(response);
+        console.log('[API Client] Response (with opinion):', data);
         return data;
     },
 

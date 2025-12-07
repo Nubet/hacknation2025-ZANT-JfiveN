@@ -398,6 +398,22 @@ function updateCaseFromParsedResponse(caseData, parseResult) {
 }
 
 /**
+ * Get documents preview for employee (includes opinion document)
+ */
+export function getEmployeeDocumentsPreview(caseId) {
+    const caseData = cases.get(caseId);
+    if (!caseData) {
+        return null;
+    }
+
+    const extractedData = caseData.extractedData || {};
+    const definition = evaluateDefinition(extractedData, caseData);
+
+    // Include opinion document for employee view
+    return generateDocuments(caseData, extractedData, definition, true);
+}
+
+/**
  * Get all cases (for debugging)
  */
 export function getAllCases() {
@@ -414,6 +430,7 @@ export default {
     getCase,
     getCaseStatus,
     getDocumentsPreview,
+    getEmployeeDocumentsPreview,
     getChatHistory,
     processChat,
     getAllCases

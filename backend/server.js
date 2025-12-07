@@ -101,7 +101,7 @@ app.get('/api/cases/:caseId/status', (req, res) => {
 
 /**
  * GET /api/cases/:caseId/documents
- * Get document previews for a case
+ * Get document previews for a case (user view - without opinion)
  */
 app.get('/api/cases/:caseId/documents', (req, res) => {
     const caseId = decodeURIComponent(req.params.caseId);
@@ -118,6 +118,28 @@ app.get('/api/cases/:caseId/documents', (req, res) => {
     }
 
     console.log(`[Server] Returning documents preview for ${caseId}`);
+    res.json(documents);
+});
+
+/**
+ * GET /api/cases/:caseId/documents/employee
+ * Get document previews for employee view (includes opinion)
+ */
+app.get('/api/cases/:caseId/documents/employee', (req, res) => {
+    const caseId = decodeURIComponent(req.params.caseId);
+    console.log(`[Server] GET /api/cases/${caseId}/documents/employee`);
+
+    const documents = caseService.getEmployeeDocumentsPreview(caseId);
+
+    if (!documents) {
+        console.log(`[Server] Case not found: ${caseId}`);
+        return res.status(404).json({
+            code: 'CASE_NOT_FOUND',
+            message: 'Sprawa o podanym identyfikatorze nie istnieje.'
+        });
+    }
+
+    console.log(`[Server] Returning employee documents preview for ${caseId} (with opinion)`);
     res.json(documents);
 });
 

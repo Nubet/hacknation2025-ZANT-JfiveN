@@ -1,4 +1,5 @@
 import { useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import DashboardHeader from './components/DashboardHeader';
 import Card from './components/Card';
@@ -7,12 +8,53 @@ import AlertBox from './components/AlertBox';
 import DocumentPreview from './components/DocumentPreview';
 import EmployeeZantHeader from './components/EmployeeZantHeader';
 import type { EmployeeCaseData } from '../types/caseTypes';
+import { api } from '../apiClient';
 
 
 const EmployeeDashboard = () => {
   const location = useLocation();
   const locationState = location.state as { caseData?: EmployeeCaseData } | null;
   const caseData = locationState?.caseData;
+  const [employeeDocuments, setEmployeeDocuments] = useState<Array<{ title: string; content: string }> | null>(null);
+
+  // Fetch employee documents with opinion
+  useEffect(() => {
+    const fetchEmployeeDocuments = async () => {
+      if (!caseData?.caseId) return;
+
+      try {
+        console.log('[EmployeeDashboard] Fetching employee documents with opinion');
+        const docs = await api.getEmployeeDocuments(caseData.caseId);
+
+        const mappedDocs = [];
+
+        // Add opinion document FIRST if available (default tab for employee)
+        if (docs.opinionHtml) {
+          mappedDocs.push({ title: 'Opinia w sprawie kwalifikacji wypadku', content: docs.opinionHtml });
+        }
+
+        // Then add other documents
+        mappedDocs.push(
+          { title: 'Zawiadomienie o wypadku przy pracy', content: docs.notificationHtml },
+          { title: 'Wyjaśnienia poszkodowanego', content: docs.explanationHtml }
+        );
+
+        setEmployeeDocuments(mappedDocs);
+        console.log('[EmployeeDashboard] Employee documents loaded:', mappedDocs.length);
+      } catch (error) {
+        console.error('[EmployeeDashboard] Error fetching employee documents:', error);
+        // Fallback to documents from caseData if API fails
+        if (caseData.documents.length > 0) {
+          setEmployeeDocuments(caseData.documents.map(doc => ({
+            title: doc.title,
+            content: doc.preview
+          })));
+        }
+      }
+    };
+
+    fetchEmployeeDocuments();
+  }, [caseData?.caseId, caseData?.documents]);
 
   // Redirect if no case data
   if (!caseData) {
@@ -36,10 +78,19 @@ const EmployeeDashboard = () => {
     status: def.status
   }));
 
-  // Generate document preview content from case data
-  const documentPreviewContent = caseData.documents.length > 0
-    ? caseData.documents[0].preview
-    : null;
+  // Use employee documents (with opinion) if available, otherwise fallback to case data
+  const documentPreviewContent = employeeDocuments && employeeDocuments.length > 0
+    ? employeeDocuments[0].content
+    : (caseData.documents.length > 0 ? caseData.documents[0].preview : null);
+
+  // Pass all documents for preview tabs (employee documents include opinion)
+  const allDocumentPreviews = employeeDocuments ||
+    (caseData.documents.length > 0
+      ? caseData.documents.map(doc => ({
+          title: doc.title,
+          content: doc.preview
+        }))
+      : null);
 
   // Case metadata
   const caseId = caseData.caseId;
@@ -119,6 +170,7 @@ const EmployeeDashboard = () => {
                 onEdit={handleEdit}
                 onExport={handleExportPdf}
                 customContent={documentPreviewContent}
+                documents={allDocumentPreviews}
               />
             </Card>
 

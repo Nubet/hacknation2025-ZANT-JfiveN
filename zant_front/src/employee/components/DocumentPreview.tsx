@@ -4,39 +4,39 @@ interface DocumentPreviewProps {
   onEdit?: () => void;
   onExport?: () => void;
   customContent?: string | null;
+  documents?: Array<{ title: string; content: string }> | null;
 }
 
-const DocumentPreview = ({ onEdit, onExport, customContent }: DocumentPreviewProps) => {
-  const [activeTab, setActiveTab] = useState<'opinion' | 'card'>('opinion');
+const DocumentPreview = ({ onEdit, onExport, customContent, documents }: DocumentPreviewProps) => {
+  const [activeTab, setActiveTab] = useState<number>(0);
+
+  // Use documents if provided, otherwise fall back to customContent or default
+  const hasDocuments = documents && documents.length > 0;
+  const currentContent = hasDocuments ? documents[activeTab]?.content : customContent;
 
   return (
     <>
-      <div className="flex gap-2.5 mb-4">
-        <button
-          className={`text-xs px-4 py-1.5 rounded-[4px] cursor-pointer transition-all duration-200 ${
-            activeTab === 'opinion'
-              ? 'border-none bg-secondary-main text-secondary-dark font-bold shadow-sm hover:bg-secondary-dark hover:text-secondary-main'
-              : 'border border-border bg-white text-text-muted font-semibold hover:bg-gray-100'
-          }`}
-          onClick={() => setActiveTab('opinion')}
-        >
-          Projekt Opinii
-        </button>
-        <button
-          className={`text-xs px-4 py-1.5 rounded-[4px] cursor-pointer transition-all duration-200 ${
-            activeTab === 'card'
-              ? 'border-none bg-secondary-main text-secondary-dark font-bold shadow-sm hover:bg-secondary-dark hover:text-secondary-main'
-              : 'border border-border bg-white text-text-muted font-semibold hover:bg-gray-100'
-          }`}
-          onClick={() => setActiveTab('card')}
-        >
-          Projekt Karty Wypadku (Wzór 2022)
-        </button>
-      </div>
+      {hasDocuments ? (
+        <div className="flex gap-2.5 mb-4 flex-wrap">
+          {documents.map((doc: { title: string; content: string }, index: number) => (
+            <button
+              key={index}
+              className={`text-xs px-4 py-1.5 rounded-[4px] cursor-pointer transition-all duration-200 ${
+                activeTab === index
+                  ? 'border-none bg-secondary-main text-secondary-dark font-bold shadow-sm hover:bg-secondary-dark hover:text-secondary-main'
+                  : 'border border-border bg-white text-text-muted font-semibold hover:bg-gray-100'
+              }`}
+              onClick={() => setActiveTab(index)}
+            >
+              {doc.title}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="bg-gray-50 border border-border p-6 font-mono text-[0.85rem] leading-relaxed text-gray-800 h-[500px] overflow-y-auto mb-4 shadow-inner">
-        {customContent ? (
-          <div dangerouslySetInnerHTML={{ __html: customContent }} />
+        {currentContent ? (
+          <div dangerouslySetInnerHTML={{ __html: currentContent }} />
         ) : (
           <>
             <strong>PROJEKT OPINII W SPRAWIE KWALIFIKACJI ZDARZENIA</strong>
