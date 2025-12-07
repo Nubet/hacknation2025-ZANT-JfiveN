@@ -181,106 +181,205 @@ function translateCommuteType(commuteType) {
 
 /**
  * Calculate overall progress percentage based on collected data
+ * Progress reflects completion of all required and recommended information
  */
 export function calculateProgress(extractedData, caseData) {
-    let progress = 10; // Base progress for submitting initial form
+    let totalPoints = 0;
+    let earnedPoints = 0;
 
-    // Accident details (max 25%)
-    if (extractedData?.accident?.date) progress += 5;
-    if (extractedData?.accident?.time) progress += 5;
-    if (extractedData?.accident?.place) progress += 5;
-    if (extractedData?.accident?.mechanism) progress += 5;
-    if (extractedData?.accident?.cause) progress += 5;
+    // === POSZKODOWANY (Injured person) - 10 points total ===
+    totalPoints += 10;
+    if (extractedData?.poszkodowany?.imie) earnedPoints += 2;
+    if (extractedData?.poszkodowany?.nazwisko) earnedPoints += 2;
+    if (extractedData?.poszkodowany?.pesel) earnedPoints += 2;
+    if (extractedData?.poszkodowany?.adres_zamieszkania || caseData?.collected_data?.adres_zamieszkania) earnedPoints += 4;
 
-    // Injury details (max 20%)
-    if (extractedData?.injury?.description) progress += 5;
-    if (extractedData?.injury?.body_parts?.length > 0) progress += 5;
-    if (extractedData?.injury?.medical_facility || caseData?.collected_data?.medical_facility) progress += 5;
-    if (caseData?.collected_data?.has_medical_docs) progress += 5;
+    // === WYPADEK - NAGŁOŚĆ (Accident suddenness) - 20 points total ===
+    totalPoints += 20;
+    if (extractedData?.accident?.date || extractedData?.wypadek?.data) earnedPoints += 8;
+    if (extractedData?.accident?.time || extractedData?.wypadek?.godzina) earnedPoints += 7;
+    if (extractedData?.accident?.circumstances || extractedData?.wypadek?.opis_okolicznosci) earnedPoints += 5;
 
-    // Witnesses (max 15%)
-    if (caseData?.collected_data?.witnesses_present !== undefined) progress += 5;
-    if (caseData?.collected_data?.witness_data) progress += 10;
+    // === WYPADEK - PRZYCZYNA ZEWNĘTRZNA (External cause) - 20 points total ===
+    totalPoints += 20;
+    if (extractedData?.accident?.place || extractedData?.wypadek?.miejsce) earnedPoints += 7;
+    if (extractedData?.accident?.cause) earnedPoints += 8;
+    if (extractedData?.accident?.mechanism) earnedPoints += 5;
 
-    // Work context (max 15%)
-    if (extractedData?.work_context?.task_performed) progress += 5;
-    if (extractedData?.work_context?.was_during_work !== null) progress += 5;
-    if (extractedData?.accident?.place_type) progress += 5;
+    // === URAZ (Injury) - 25 points total ===
+    totalPoints += 25;
+    if (extractedData?.injury?.description || extractedData?.urazy?.opis) earnedPoints += 8;
+    if (extractedData?.injury?.body_parts?.length > 0) earnedPoints += 4;
 
-    // Chat progress (max 15%)
-    const chatMessages = caseData?.chatHistory?.filter(m => m.type === 'user')?.length || 0;
-    progress += Math.min(chatMessages * 3, 15);
+    // Medical facility
+    const hasMedicalFacility = extractedData?.injury?.medical_facility ||
+                              extractedData?.urazy?.hospitalizacja?.nazwa_placowki ||
+                              caseData?.collected_data?.medical_facility;
+    if (hasMedicalFacility) earnedPoints += 7;
 
-    return Math.min(progress, 100);
+    // Hospitalization info
+    if (caseData?.collected_data?.czy_hospitalizowany !== undefined) earnedPoints += 3;
+    if (caseData?.collected_data?.has_medical_docs) earnedPoints += 3;
+
+    // === ŚWIADKOWIE (Witnesses) - 10 points total ===
+    totalPoints += 10;
+    if (caseData?.collected_data?.witnesses_present !== undefined) earnedPoints += 4;
+    if (caseData?.collected_data?.witnesses_present === true) {
+        if (caseData?.collected_data?.witness_data ||
+            (extractedData?.swiadkowie?.length > 0 && extractedData.swiadkowie[0]?.imie_nazwisko)) {
+            earnedPoints += 6;
+        }
+    } else if (caseData?.collected_data?.witnesses_present === false) {
+        earnedPoints += 6; // Full points if no witnesses
+    }
+
+    // === ZWIĄZEK Z PRACĄ (Work relation) - 15 points total ===
+    totalPoints += 15;
+    if (extractedData?.work_context?.task_performed || caseData?.collected_data?.task_performed) earnedPoints += 8;
+    if (extractedData?.work_context?.was_during_work !== null) earnedPoints += 4;
+    if (extractedData?.work_context?.employer_or_business) earnedPoints += 3;
+
+    // Calculate percentage
+    const progressPercent = Math.round((earnedPoints / totalPoints) * 100);
+
+    console.log(`[DefinitionService] Progress calculation: ${earnedPoints}/${totalPoints} = ${progressPercent}%`);
+
+    return Math.min(progressPercent, 100);
 }
 
 /**
  * Compute missing information based on extracted data and definition status
+ * This shows ALL information that is missing or will be asked by the chat
  */
 export function computeMissingInfo(extractedData, definitionStatus, caseData) {
     const requiredMissing = [];
     const recommendedMissing = [];
     const documentsNeeded = [];
 
-    // Required based on definition status
+    // === POSZKODOWANY (Injured person) ===
+    if (!extractedData?.poszkodowany?.adres_zamieszkania && !caseData?.collected_data?.adres_zamieszkania) {
+        requiredMissing.push('Adres zamieszkania poszkodowanego');
+    }
+    if (!extractedData?.poszkodowany?.data_urodzenia && !caseData?.collected_data?.data_urodzenia) {
+        recommendedMissing.push('Data urodzenia poszkodowanego');
+    }
+    if (!extractedData?.poszkodowany?.dokument_tozsamosci && !caseData?.collected_data?.dokument_tozsamosci) {
+        recommendedMissing.push('Numer i rodzaj dokumentu tożsamości');
+    }
+
+    // === NAGŁOŚĆ (Suddenness) ===
     if (definitionStatus.suddenness.status === 'EMPTY') {
-        requiredMissing.push('Data i godzina wypadku');
+        if (!extractedData?.accident?.date && !extractedData?.wypadek?.data) {
+            requiredMissing.push('Data wypadku');
+        }
+        if (!extractedData?.accident?.time && !extractedData?.wypadek?.godzina) {
+            requiredMissing.push('Godzina wypadku');
+        }
     } else if (definitionStatus.suddenness.status === 'PARTIAL') {
-        if (!extractedData?.accident?.time) {
+        if (!extractedData?.accident?.time && !extractedData?.wypadek?.godzina) {
             recommendedMissing.push('Dokładna godzina zdarzenia');
         }
     }
 
+    // === PRZYCZYNA ZEWNĘTRZNA (External Cause) ===
     if (definitionStatus.externalCause.status === 'EMPTY' || definitionStatus.externalCause.status === 'PARTIAL') {
+        if (!extractedData?.accident?.place && !extractedData?.wypadek?.miejsce) {
+            requiredMissing.push('Dokładne miejsce wypadku');
+        }
         if (!extractedData?.accident?.cause) {
-            requiredMissing.push('Opis przyczyny zewnętrznej zdarzenia');
+            requiredMissing.push('Opis przyczyny zewnętrznej zdarzenia (co spowodowało wypadek)');
+        }
+        if (!extractedData?.accident?.circumstances && !extractedData?.wypadek?.opis_okolicznosci) {
+            recommendedMissing.push('Szczegółowe okoliczności wypadku');
         }
     }
 
+    // === URAZ (Injury) ===
     if (definitionStatus.injury.status === 'EMPTY') {
         requiredMissing.push('Opis doznanych obrażeń');
     }
 
-    if (definitionStatus.workRelation.status === 'EMPTY' || definitionStatus.workRelation.status === 'PARTIAL') {
-        if (!extractedData?.work_context?.task_performed) {
-            requiredMissing.push('Opis czynności wykonywanej w momencie wypadku');
+    // Pierwsza pomoc (First aid)
+    if (extractedData?.urazy?.pierwsza_pomoc?.udzielono === null &&
+        caseData?.collected_data?.pierwsza_pomoc_udzielono === undefined) {
+        recommendedMissing.push('Informacja czy udzielono pierwszej pomocy');
+    }
+    if ((extractedData?.urazy?.pierwsza_pomoc?.udzielono === true ||
+         caseData?.collected_data?.pierwsza_pomoc_udzielono === true) &&
+        !extractedData?.urazy?.pierwsza_pomoc?.kto_udzielil &&
+        !caseData?.collected_data?.pierwsza_pomoc_kto) {
+        recommendedMissing.push('Kto udzielił pierwszej pomocy');
+    }
+
+    // Hospitalizacja (Hospitalization)
+    if (extractedData?.urazy?.hospitalizacja?.czy_hospitalizowany === null &&
+        caseData?.collected_data?.czy_hospitalizowany === undefined) {
+        requiredMissing.push('Informacja czy poszkodowany był hospitalizowany');
+    }
+
+    // Medical facility
+    const hasMedicalFacility = extractedData?.injury?.medical_facility ||
+                              extractedData?.urazy?.hospitalizacja?.nazwa_placowki ||
+                              caseData?.collected_data?.medical_facility ||
+                              caseData?.collected_data?.nazwa_placowki;
+
+    if (!hasMedicalFacility) {
+        requiredMissing.push('Nazwa placówki medycznej');
+    }
+
+    const hasMedicalAddress = extractedData?.urazy?.hospitalizacja?.adres_placowki ||
+                             caseData?.collected_data?.adres_placowki;
+    if (hasMedicalFacility && !hasMedicalAddress) {
+        recommendedMissing.push('Adres placówki medycznej');
+    }
+
+    // === ŚWIADKOWIE (Witnesses) ===
+    const witnessPresent = extractedData?.witnesses?.were_present ?? caseData?.collected_data?.witnesses_present;
+    if (witnessPresent === null || witnessPresent === undefined) {
+        requiredMissing.push('Informacja o obecności świadków');
+    } else if (witnessPresent === true) {
+        const hasWitnessData = (extractedData?.witnesses?.witness_data?.length > 0) ||
+                              (extractedData?.swiadkowie?.length > 0 && extractedData.swiadkowie.some(s => s.imie_nazwisko)) ||
+                              caseData?.collected_data?.witness_data;
+
+        if (!hasWitnessData) {
+            requiredMissing.push('Dane świadka (imię, nazwisko)');
+        } else {
+            const hasWitnessAddress = (extractedData?.swiadkowie?.length > 0 && extractedData.swiadkowie.some(s => s.adres)) ||
+                                     caseData?.collected_data?.witness_address;
+            if (!hasWitnessAddress) {
+                recommendedMissing.push('Adres świadka');
+            }
         }
     }
 
-    // Witness info
-    if (caseData?.collected_data?.witnesses_present === undefined) {
-        requiredMissing.push('Informacja o obecności świadków');
-    } else if (caseData?.collected_data?.witnesses_present && !caseData?.collected_data?.witness_data) {
-        requiredMissing.push('Dane świadka zdarzenia (imię, nazwisko, adres)');
+    // === ZWIĄZEK Z PRACĄ (Work Relation) ===
+    if (definitionStatus.workRelation.status === 'EMPTY' || definitionStatus.workRelation.status === 'PARTIAL') {
+        if (!extractedData?.work_context?.task_performed && !caseData?.collected_data?.task_performed) {
+            requiredMissing.push('Czynność wykonywana w momencie wypadku');
+        }
     }
 
-    // Medical info
-    if (!extractedData?.injury?.medical_facility && !caseData?.collected_data?.medical_facility) {
-        requiredMissing.push('Nazwa i adres placówki medycznej');
-    }
-
-    // Recommended
-    if (!extractedData?.accident?.place) {
-        recommendedMissing.push('Dokładne miejsce zdarzenia');
-    }
-
-    // Documents needed
+    // === DOCUMENTS ===
+    // Medical documentation
     if (extractedData?.injury?.description || definitionStatus.injury.status !== 'EMPTY') {
         if (!caseData?.collected_data?.has_medical_docs) {
-            documentsNeeded.push('Dokumentacja medyczna potwierdzająca uraz');
+            documentsNeeded.push('Dokumentacja medyczna potwierdzająca uraz (karta leczenia, zaświadczenie lekarskie)');
         }
     }
 
+    // Traffic accident - police report
     if (extractedData?.accident?.mechanism === 'TRAFFIC') {
-        documentsNeeded.push('Notatka policji z miejsca zdarzenia');
+        documentsNeeded.push('Notatka policji z miejsca zdarzenia (wypadek komunikacyjny)');
     }
 
-    if (caseData?.collected_data?.witnesses_present) {
-        documentsNeeded.push('Oświadczenie świadka zdarzenia');
+    // Witness statement
+    if (caseData?.collected_data?.witnesses_present === true) {
+        documentsNeeded.push('Oświadczenie świadka zdarzenia (imię, nazwisko, opis tego co widział)');
     }
 
-    // Always recommend these
-    documentsNeeded.push('Kopia dokumentu potwierdzającego prowadzenie działalności gospodarczej');
+    // Business activity proof - always needed for self-employed
+    documentsNeeded.push('Kopia dokumentu potwierdzającego prowadzenie działalności gospodarczej (CEIDG, KRS)');
 
     return {
         requiredMissing,
@@ -301,7 +400,6 @@ export function computeEntitlementDecision(definitionStatus) {
     ];
 
     const completeCount = statuses.filter(s => s === 'COMPLETE').length;
-    const partialCount = statuses.filter(s => s === 'PARTIAL').length;
     const emptyCount = statuses.filter(s => s === 'EMPTY').length;
 
     if (completeCount === 4) {
