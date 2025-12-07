@@ -85,10 +85,19 @@ const CaseDetails: React.FC = () => {
 
     // Ref for auto-scrolling chat to bottom
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll to bottom when messages change
+    // Auto-scroll to bottom when messages change (only within chat container)
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (chatEndRef.current && chatContainerRef.current) {
+            // Scroll the chat container, not the whole page
+            const container = chatContainerRef.current;
+            const scrollHeight = container.scrollHeight;
+            container.scrollTo({
+                top: scrollHeight,
+                behavior: 'smooth'
+            });
+        }
     }, [messages]);
 
     // Map API status to UI status
@@ -489,7 +498,7 @@ const CaseDetails: React.FC = () => {
                                 Na podstawie Twojego opisu uzupełniamy formalne informacje potrzebne do zgłoszenia wypadku.
                             </div>
                         </div>
-                        <div className="flex-1 p-5 overflow-y-auto flex flex-col gap-[15px] bg-white max-h-[600px]">
+                        <div ref={chatContainerRef} className="flex-1 p-5 overflow-y-auto flex flex-col gap-[15px] bg-white max-h-[600px] scroll-smooth">
                             {messages.map((msg) => (
                                 <React.Fragment key={msg.id}>
                                     <div className={`flex w-full ${msg.type === 'assistant' ? 'justify-start' : msg.type === 'user' ? 'justify-end' : 'justify-center'}`}>
