@@ -7,6 +7,8 @@ import type {
     DocumentsPreviewResponse,
     ChatMessage
 } from './apiClient';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // Types for the case data
 interface QuickAction {
@@ -304,6 +306,66 @@ const CaseDetails: React.FC = () => {
         handleSendMessage(action.label, action.value);
     };
 
+    // Handle PDF download
+    const handleDownloadPDF = async (documentTitle: string, htmlContent: string) => {
+        console.log('[CaseDetails] Generating PDF for:', documentTitle);
+
+        try {
+            // Create a temporary div to render the HTML content
+            const tempDiv = document.createElement('div');
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.left = '-9999px';
+            tempDiv.style.width = '800px';
+            tempDiv.style.padding = '20px';
+            tempDiv.style.backgroundColor = 'white';
+            tempDiv.style.fontFamily = 'Arial, sans-serif';
+            tempDiv.style.fontSize = '12px';
+            tempDiv.innerHTML = htmlContent;
+            document.body.appendChild(tempDiv);
+
+            // Convert HTML to canvas
+            const canvas = await html2canvas(tempDiv, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff'
+            });
+
+            // Remove temporary div
+            document.body.removeChild(tempDiv);
+
+            // Create PDF
+            const imgWidth = 210; // A4 width in mm
+            const pageHeight = 297; // A4 height in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            let position = 0;
+
+            // Add image to PDF (handle multiple pages if needed)
+            const imgData = canvas.toDataURL('image/png');
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            // Download the PDF
+            const fileName = `${documentTitle.replace(/[^a-z0-9]/gi, '_')}_${caseId.replace(/\//g, '_')}.pdf`;
+            pdf.save(fileName);
+
+            console.log('[CaseDetails] PDF downloaded:', fileName);
+        } catch (error) {
+            console.error('[CaseDetails] Error generating PDF:', error);
+            alert('Wystąpił błąd podczas generowania PDF. Spróbuj ponownie.');
+        }
+    };
+
 
     const getStatusClass = (status: string) => {
         switch (status) {
@@ -555,11 +617,11 @@ const CaseDetails: React.FC = () => {
                                         dangerouslySetInnerHTML={{ __html: doc.preview }}
                                     />
                                     <div className="mt-[5px] flex gap-[10px]">
-                                        <button className="rounded border border-secondary-main bg-secondary-main text-secondary-dark py-1.5 px-3.5 text-[0.8rem] cursor-pointer font-semibold hover:bg-secondary-dark hover:text-secondary-main transition-colors duration-200">
+                                        <button
+                                            className="rounded border border-secondary-main bg-secondary-main text-secondary-dark py-1.5 px-3.5 text-[0.8rem] cursor-pointer font-semibold hover:bg-secondary-dark hover:text-secondary-main transition-colors duration-200"
+                                            onClick={() => handleDownloadPDF(doc.title, doc.preview)}
+                                        >
                                             Pobierz jako PDF
-                                        </button>
-                                        <button className="rounded border border-border-light bg-white text-text-main py-1.5 px-3.5 text-[0.8rem] cursor-pointer font-semibold">
-                                            Pobierz jako .docx
                                         </button>
                                     </div>
                                 </div>
