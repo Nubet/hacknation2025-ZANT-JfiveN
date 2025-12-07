@@ -93,7 +93,13 @@ export interface ChatMessage {
 // Configuration
 // ==========================================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+const getApiBaseUrl = () => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+    // If URL doesn't end with /api, add it
+    return baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 console.log('[API Client] Using API base URL:', API_BASE_URL);
 
