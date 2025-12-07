@@ -214,35 +214,137 @@ function updateCaseFromParsedResponse(caseData, parseResult) {
 
     // Initialize extractedData if needed
     if (!caseData.extractedData) {
-        caseData.extractedData = { accident: {}, injury: {}, work_context: {}, witnesses: {} };
+        caseData.extractedData = {
+            accident: {},
+            injury: {},
+            work_context: {},
+            witnesses: {},
+            poszkodowany: {},
+            wypadek: {},
+            urazy: {
+                pierwsza_pomoc: {},
+                hospitalizacja: {}
+            },
+            swiadkowie: []
+        };
     }
 
-    // Update accident info in extractedData
+    // Initialize Polish structure if needed
+    if (!caseData.extractedData.poszkodowany) {
+        caseData.extractedData.poszkodowany = {};
+    }
+    if (!caseData.extractedData.wypadek) {
+        caseData.extractedData.wypadek = {};
+    }
+    if (!caseData.extractedData.urazy) {
+        caseData.extractedData.urazy = { pierwsza_pomoc: {}, hospitalizacja: {} };
+    }
+    if (!caseData.extractedData.urazy.pierwsza_pomoc) {
+        caseData.extractedData.urazy.pierwsza_pomoc = {};
+    }
+    if (!caseData.extractedData.urazy.hospitalizacja) {
+        caseData.extractedData.urazy.hospitalizacja = {};
+    }
+    if (!caseData.extractedData.swiadkowie) {
+        caseData.extractedData.swiadkowie = [];
+    }
+
+    // === POSZKODOWANY (Injured person) ===
+    if (extractedInfo.adres_zamieszkania || caseUpdates.adres_zamieszkania) {
+        const value = extractedInfo.adres_zamieszkania || caseUpdates.adres_zamieszkania;
+        caseData.extractedData.poszkodowany.adres_zamieszkania = value;
+        caseData.collected_data.adres_zamieszkania = value;
+    }
+    if (extractedInfo.data_urodzenia || caseUpdates.data_urodzenia) {
+        const value = extractedInfo.data_urodzenia || caseUpdates.data_urodzenia;
+        caseData.extractedData.poszkodowany.data_urodzenia = value;
+        caseData.collected_data.data_urodzenia = value;
+    }
+    if (extractedInfo.dokument_tozsamosci || caseUpdates.dokument_tozsamosci) {
+        const value = extractedInfo.dokument_tozsamosci || caseUpdates.dokument_tozsamosci;
+        caseData.extractedData.poszkodowany.dokument_tozsamosci = value;
+        caseData.collected_data.dokument_tozsamosci = value;
+    }
+
+    // === WYPADEK (Accident) ===
+    // Update accident info in extractedData (both Polish and English)
     if (extractedInfo.accident_date) {
         caseData.extractedData.accident = caseData.extractedData.accident || {};
         caseData.extractedData.accident.date = extractedInfo.accident_date;
+        caseData.extractedData.wypadek.data = extractedInfo.accident_date;
     }
     if (extractedInfo.accident_time) {
         caseData.extractedData.accident = caseData.extractedData.accident || {};
         caseData.extractedData.accident.time = extractedInfo.accident_time;
+        caseData.extractedData.wypadek.godzina = extractedInfo.accident_time;
     }
     if (extractedInfo.accident_place) {
         caseData.extractedData.accident = caseData.extractedData.accident || {};
         caseData.extractedData.accident.place = extractedInfo.accident_place;
+        caseData.extractedData.wypadek.miejsce = extractedInfo.accident_place;
     }
     if (extractedInfo.cause) {
         caseData.extractedData.accident = caseData.extractedData.accident || {};
         caseData.extractedData.accident.cause = extractedInfo.cause;
     }
 
-    // Update injury info in extractedData
+    // === URAZY (Injuries) ===
+    // Update injury info in extractedData (both Polish and English)
     if (extractedInfo.injury_description) {
         caseData.extractedData.injury = caseData.extractedData.injury || {};
         caseData.extractedData.injury.description = extractedInfo.injury_description;
+        caseData.extractedData.urazy.opis = extractedInfo.injury_description;
     }
     if (extractedInfo.body_parts && extractedInfo.body_parts.length > 0) {
         caseData.extractedData.injury = caseData.extractedData.injury || {};
         caseData.extractedData.injury.body_parts = extractedInfo.body_parts;
+    }
+
+    // Pierwsza pomoc (First aid)
+    if (extractedInfo.pierwsza_pomoc_udzielono !== undefined && extractedInfo.pierwsza_pomoc_udzielono !== null) {
+        caseData.extractedData.urazy.pierwsza_pomoc.udzielono = extractedInfo.pierwsza_pomoc_udzielono;
+        caseData.collected_data.pierwsza_pomoc_udzielono = extractedInfo.pierwsza_pomoc_udzielono;
+    }
+    if (caseUpdates.pierwsza_pomoc_udzielono !== undefined) {
+        caseData.extractedData.urazy.pierwsza_pomoc.udzielono = caseUpdates.pierwsza_pomoc_udzielono;
+        caseData.collected_data.pierwsza_pomoc_udzielono = caseUpdates.pierwsza_pomoc_udzielono;
+    }
+    if (extractedInfo.pierwsza_pomoc_kto || caseUpdates.pierwsza_pomoc_kto) {
+        const value = extractedInfo.pierwsza_pomoc_kto || caseUpdates.pierwsza_pomoc_kto;
+        caseData.extractedData.urazy.pierwsza_pomoc.kto_udzielil = value;
+        caseData.collected_data.pierwsza_pomoc_kto = value;
+    }
+
+    // Hospitalizacja (Hospitalization)
+    if (extractedInfo.czy_hospitalizowany !== undefined && extractedInfo.czy_hospitalizowany !== null) {
+        caseData.extractedData.urazy.hospitalizacja.czy_hospitalizowany = extractedInfo.czy_hospitalizowany;
+        caseData.collected_data.czy_hospitalizowany = extractedInfo.czy_hospitalizowany;
+    }
+    if (caseUpdates.czy_hospitalizowany !== undefined) {
+        caseData.extractedData.urazy.hospitalizacja.czy_hospitalizowany = caseUpdates.czy_hospitalizowany;
+        caseData.collected_data.czy_hospitalizowany = caseUpdates.czy_hospitalizowany;
+    }
+
+    // Medical facility (Placówka medyczna)
+    if (extractedInfo.medical_facility_name || extractedInfo.nazwa_placowki || caseUpdates.nazwa_placowki) {
+        const value = extractedInfo.medical_facility_name || extractedInfo.nazwa_placowki || caseUpdates.nazwa_placowki;
+        caseData.collected_data.medical_facility = value;
+        caseData.collected_data.nazwa_placowki = value;
+        caseData.extractedData.urazy.hospitalizacja.nazwa_placowki = value;
+    }
+    if (extractedInfo.medical_facility_address || extractedInfo.adres_placowki || caseUpdates.adres_placowki) {
+        const value = extractedInfo.medical_facility_address || extractedInfo.adres_placowki || caseUpdates.adres_placowki;
+        if (caseData.collected_data.medical_facility && !caseData.collected_data.medical_facility.includes(value)) {
+            caseData.collected_data.medical_facility += `, ${value}`;
+        }
+        caseData.collected_data.adres_placowki = value;
+        caseData.extractedData.urazy.hospitalizacja.adres_placowki = value;
+    }
+    if (extractedInfo.has_medical_docs !== undefined && extractedInfo.has_medical_docs !== null) {
+        caseData.collected_data.has_medical_docs = extractedInfo.has_medical_docs;
+    }
+    if (caseUpdates.has_medical_docs !== undefined) {
+        caseData.collected_data.has_medical_docs = caseUpdates.has_medical_docs;
     }
 
     // Update work context
@@ -252,33 +354,36 @@ function updateCaseFromParsedResponse(caseData, parseResult) {
         caseData.collected_data.task_performed = extractedInfo.task_performed;
     }
 
-    // Update witness info
+    // === ŚWIADKOWIE (Witnesses) ===
     if (caseUpdates.witnesses_present !== undefined) {
         caseData.collected_data.witnesses_present = caseUpdates.witnesses_present;
         caseData.extractedData.witnesses = caseData.extractedData.witnesses || {};
         caseData.extractedData.witnesses.were_present = caseUpdates.witnesses_present;
     }
-    if (extractedInfo.witness_name) {
-        caseData.collected_data.witness_data = extractedInfo.witness_name;
+    if (extractedInfo.witness_name || caseUpdates.witness_data) {
+        const witnessName = extractedInfo.witness_name || caseUpdates.witness_data;
+        caseData.collected_data.witness_data = witnessName;
         caseData.extractedData.witnesses = caseData.extractedData.witnesses || {};
-        caseData.extractedData.witnesses.witness_data = [extractedInfo.witness_name];
-        if (extractedInfo.witness_address) {
-            caseData.collected_data.witness_data += `, ${extractedInfo.witness_address}`;
-        }
-    }
+        caseData.extractedData.witnesses.witness_data = [witnessName];
 
-    // Update medical info
-    if (extractedInfo.medical_facility_name) {
-        caseData.collected_data.medical_facility = extractedInfo.medical_facility_name;
-        if (extractedInfo.medical_facility_address) {
-            caseData.collected_data.medical_facility += `, ${extractedInfo.medical_facility_address}`;
+        // Update Polish swiadkowie array
+        if (caseData.extractedData.swiadkowie.length === 0) {
+            caseData.extractedData.swiadkowie.push({ imie_nazwisko: witnessName, adres: null });
+        } else {
+            caseData.extractedData.swiadkowie[0].imie_nazwisko = witnessName;
         }
     }
-    if (extractedInfo.has_medical_docs !== undefined && extractedInfo.has_medical_docs !== null) {
-        caseData.collected_data.has_medical_docs = extractedInfo.has_medical_docs;
-    }
-    if (caseUpdates.has_medical_docs !== undefined) {
-        caseData.collected_data.has_medical_docs = caseUpdates.has_medical_docs;
+    if (extractedInfo.witness_address || caseUpdates.witness_address) {
+        const witnessAddress = extractedInfo.witness_address || caseUpdates.witness_address;
+        if (caseData.collected_data.witness_data) {
+            caseData.collected_data.witness_data += `, ${witnessAddress}`;
+        }
+        caseData.collected_data.witness_address = witnessAddress;
+
+        // Update Polish swiadkowie array
+        if (caseData.extractedData.swiadkowie.length > 0) {
+            caseData.extractedData.swiadkowie[0].adres = witnessAddress;
+        }
     }
 
     // Update extracted data with additional facts

@@ -68,6 +68,39 @@ Zawsze odpowiadaj TYLKO w formacie JSON, bez żadnego tekstu przed ani po.
 
 Struktura odpowiedzi:
 {
+  "poszkodowany": {
+    "imie": "imię poszkodowanego lub null",
+    "nazwisko": "nazwisko poszkodowanego lub null",
+    "pesel": "numer PESEL lub null",
+    "data_urodzenia": "data urodzenia w formacie YYYY-MM-DD lub null",
+    "dokument_tozsamosci": "numer i rodzaj dokumentu tożsamości (np. dowód osobisty ABC123456) lub null",
+    "adres_zamieszkania": "pełny adres zamieszkania lub null",
+    "telefon": "numer telefonu lub null"
+  },
+  "wypadek": {
+    "data": "data wypadku w formacie YYYY-MM-DD lub null jeśli nie podano",
+    "godzina": "godzina wypadku w formacie HH:MM lub null jeśli nie podano",
+    "miejsce": "dokładne miejsce wypadku (np. magazyn firmy X, ulica Y) lub null",
+    "opis_okolicznosci": "szczegółowy opis okoliczności lub null"
+  },
+  "urazy": {
+    "opis": "opis doznanych obrażeń lub null",
+    "pierwsza_pomoc": {
+      "udzielono": "czy udzielono pierwszej pomocy: true/false/null",
+      "kto_udzielil": "kto udzielił pierwszej pomocy (np. współpracownik, ratownik) lub null"
+    },
+    "hospitalizacja": {
+      "czy_hospitalizowany": "czy poszkodowany był hospitalizowany: true/false/null",
+      "nazwa_placowki": "nazwa szpitala/placówki medycznej lub null",
+      "adres_placowki": "adres placówki medycznej lub null"
+    }
+  },
+  "swiadkowie": [
+    {
+      "imie_nazwisko": "imię i nazwisko świadka lub null",
+      "adres": "adres świadka lub null"
+    }
+  ],
   "accident": {
     "date": "data wypadku w formacie YYYY-MM-DD lub null jeśli nie podano",
     "time": "godzina wypadku w formacie HH:MM lub null jeśli nie podano",
@@ -96,7 +129,10 @@ Struktura odpowiedzi:
   "extracted_facts": ["lista wszystkich kluczowych faktów wyciągniętych z opisu"]
 }
 
-WAŻNE: Ustaw wartość na null tylko gdy informacja NIE została podana w opisie. Nie zgaduj!`;
+WAŻNE: 
+- Ustaw wartość na null tylko gdy informacja NIE została podana w opisie. Nie zgaduj!
+- Dla pola swiadkowie, jeśli nie wymieniono żadnych świadków, zwróć pustą tablicę []
+- Synchronizuj dane między polami polskimi (poszkodowany, wypadek, urazy, swiadkowie) a angielskimi (accident, injury, witnesses)`;
 
     const userPrompt = `Przeanalizuj poniższy opis wypadku i wyciągnij WSZYSTKIE dostępne informacje.
 
@@ -117,7 +153,7 @@ Odpowiedz TYLKO w formacie JSON.`;
     ], true);
 
     if (!response) {
-        return fallbackExtraction(description);
+        return fallbackExtraction(description, firstName, lastName, pesel, phoneNumber);
     }
 
     try {
@@ -126,14 +162,14 @@ Odpowiedz TYLKO w formacie JSON.`;
         return parsed;
     } catch (e) {
         console.error('[OpenRouter] Failed to parse extraction response:', e.message);
-        return fallbackExtraction(description);
+        return fallbackExtraction(description, firstName, lastName, pesel, phoneNumber);
     }
 }
 
 /**
  * Fallback extraction when AI is not available
  */
-function fallbackExtraction(description) {
+function fallbackExtraction(description, firstName = '', lastName = '', pesel = '', phoneNumber = '') {
     const dateMatch = description.match(/(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})/);
     const timeMatch = description.match(/(\d{1,2})[:\.](\d{2})/);
 
@@ -142,6 +178,7 @@ function fallbackExtraction(description) {
     const hasMachine = /maszyn|urządzen|narzędzi/i.test(description);
     const hasInjury = /uraz|złam|skalecz|ból|zranien|obraż/i.test(description);
     const hasMedical = /szpital|lekarz|pogotow|SOR|przychodn/i.test(description);
+    const hasFirstAid = /pierwsz[aą] pomoc|opatrz|bandaż/i.test(description);
 
     let mechanism = null;
     if (hasSlip || hasFall) mechanism = 'SLIP_TRIP_FALL';
@@ -157,10 +194,46 @@ function fallbackExtraction(description) {
     const injuryMatch = description.match(/uraz[^,.]*|złaman[^,.]*|skaleczen[^,.]*/i);
     if (injuryMatch) injuryDesc = injuryMatch[0];
 
+    // Extract hospital/medical facility name
+    let hospitalName = null;
+    const hospitalMatch = description.match(/(?:szpital|SOR|przychodnia|klinika)[^,.]*[^,.]*/i);
+    if (hospitalMatch) hospitalName = hospitalMatch[0].trim();
+
+    const accidentDate = dateMatch ? `${dateMatch[3]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[1].padStart(2, '0')}` : null;
+    const accidentTime = timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : null;
+
     return {
+        poszkodowany: {
+            imie: firstName || null,
+            nazwisko: lastName || null,
+            pesel: pesel || null,
+            data_urodzenia: null,
+            dokument_tozsamosci: null,
+            adres_zamieszkania: null,
+            telefon: phoneNumber || null
+        },
+        wypadek: {
+            data: accidentDate,
+            godzina: accidentTime,
+            miejsce: place,
+            opis_okolicznosci: description.substring(0, 300)
+        },
+        urazy: {
+            opis: injuryDesc || (hasInjury ? 'uraz wymagający weryfikacji' : null),
+            pierwsza_pomoc: {
+                udzielono: hasFirstAid ? true : null,
+                kto_udzielil: null
+            },
+            hospitalizacja: {
+                czy_hospitalizowany: hasMedical ? true : null,
+                nazwa_placowki: hospitalName,
+                adres_placowki: null
+            }
+        },
+        swiadkowie: [],
         accident: {
-            date: dateMatch ? `${dateMatch[3]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[1].padStart(2, '0')}` : null,
-            time: timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : null,
+            date: accidentDate,
+            time: accidentTime,
             place: place,
             place_type: place ? 'OTHER' : null,
             circumstances: description.substring(0, 300),
@@ -171,7 +244,7 @@ function fallbackExtraction(description) {
             description: injuryDesc || (hasInjury ? 'uraz wymagający weryfikacji' : null),
             body_parts: [],
             medical_help: hasMedical ? true : null,
-            medical_facility: null
+            medical_facility: hospitalName
         },
         work_context: {
             task_performed: null,
@@ -197,45 +270,101 @@ export function determineMissingInfo(extractedData, collectedData = {}) {
         documents: []
     };
 
+    // === POSZKODOWANY (Injured person data) ===
+    // Data urodzenia - can be derived from PESEL but good to have
+    if (!extractedData?.poszkodowany?.data_urodzenia && !collectedData?.data_urodzenia) {
+        missing.recommended.push({ id: 'data_urodzenia', label: 'Data urodzenia poszkodowanego' });
+    }
+    // Dokument tożsamości
+    if (!extractedData?.poszkodowany?.dokument_tozsamosci && !collectedData?.dokument_tozsamosci) {
+        missing.recommended.push({ id: 'dokument_tozsamosci', label: 'Numer i rodzaj dokumentu tożsamości' });
+    }
+    // Adres zamieszkania
+    if (!extractedData?.poszkodowany?.adres_zamieszkania && !collectedData?.adres_zamieszkania) {
+        missing.critical.push({ id: 'adres_zamieszkania', label: 'Adres zamieszkania poszkodowanego' });
+    }
+
+    // === WYPADEK (Accident data) ===
     // Critical information required for ZUS
-    if (!extractedData?.accident?.date) {
+    if (!extractedData?.accident?.date && !extractedData?.wypadek?.data) {
         missing.critical.push({ id: 'accident_date', label: 'Data wypadku' });
     }
-    if (!extractedData?.accident?.time) {
+    if (!extractedData?.accident?.time && !extractedData?.wypadek?.godzina) {
         missing.recommended.push({ id: 'accident_time', label: 'Godzina wypadku' });
     }
-    if (!extractedData?.accident?.place) {
+    if (!extractedData?.accident?.place && !extractedData?.wypadek?.miejsce) {
         missing.critical.push({ id: 'accident_place', label: 'Miejsce wypadku' });
     }
-    if (!extractedData?.accident?.circumstances) {
+    if (!extractedData?.accident?.circumstances && !extractedData?.wypadek?.opis_okolicznosci) {
         missing.critical.push({ id: 'circumstances', label: 'Okoliczności wypadku' });
     }
     if (!extractedData?.accident?.cause) {
         missing.critical.push({ id: 'cause', label: 'Przyczyna wypadku' });
     }
 
+    // === URAZY (Injury data) ===
     // Injury information
-    if (!extractedData?.injury?.description) {
+    if (!extractedData?.injury?.description && !extractedData?.urazy?.opis) {
         missing.critical.push({ id: 'injury_description', label: 'Opis doznanych obrażeń' });
     }
     if (!extractedData?.injury?.body_parts || extractedData.injury.body_parts.length === 0) {
         missing.recommended.push({ id: 'body_parts', label: 'Uszkodzone części ciała' });
     }
 
-    // Medical information
-    if (!extractedData?.injury?.medical_facility && !collectedData?.medical_facility) {
-        missing.critical.push({ id: 'medical_facility', label: 'Nazwa i adres placówki medycznej' });
+    // Pierwsza pomoc (First aid)
+    if (extractedData?.urazy?.pierwsza_pomoc?.udzielono === null && collectedData?.pierwsza_pomoc_udzielono === undefined) {
+        missing.recommended.push({ id: 'pierwsza_pomoc_udzielono', label: 'Czy udzielono pierwszej pomocy' });
     }
+    if ((extractedData?.urazy?.pierwsza_pomoc?.udzielono === true || collectedData?.pierwsza_pomoc_udzielono === true)
+        && !extractedData?.urazy?.pierwsza_pomoc?.kto_udzielil && !collectedData?.pierwsza_pomoc_kto) {
+        missing.recommended.push({ id: 'pierwsza_pomoc_kto', label: 'Kto udzielił pierwszej pomocy' });
+    }
+
+    // Hospitalizacja (Hospitalization)
+    if (extractedData?.urazy?.hospitalizacja?.czy_hospitalizowany === null && collectedData?.czy_hospitalizowany === undefined) {
+        missing.critical.push({ id: 'czy_hospitalizowany', label: 'Czy poszkodowany był hospitalizowany' });
+    }
+
+    // Medical facility information (Placówka medyczna)
+    const hasMedicalFacility = extractedData?.injury?.medical_facility
+        || extractedData?.urazy?.hospitalizacja?.nazwa_placowki
+        || collectedData?.medical_facility
+        || collectedData?.nazwa_placowki;
+
+    if (!hasMedicalFacility) {
+        missing.critical.push({ id: 'medical_facility', label: 'Nazwa placówki medycznej' });
+    }
+
+    const hasMedicalAddress = extractedData?.urazy?.hospitalizacja?.adres_placowki || collectedData?.adres_placowki;
+    if (hasMedicalFacility && !hasMedicalAddress) {
+        missing.recommended.push({ id: 'adres_placowki', label: 'Adres placówki medycznej' });
+    }
+
     if (collectedData?.has_medical_docs !== true) {
         missing.documents.push({ id: 'medical_docs', label: 'Dokumentacja medyczna potwierdzająca uraz' });
     }
 
+    // === ŚWIADKOWIE (Witnesses) ===
     // Witness information
-    if (extractedData?.witnesses?.were_present === null && collectedData?.witnesses_present === undefined) {
+    const witnessPresent = extractedData?.witnesses?.were_present ?? collectedData?.witnesses_present;
+    if (witnessPresent === null || witnessPresent === undefined) {
         missing.critical.push({ id: 'witness_presence', label: 'Informacja o obecności świadków' });
-    } else if ((extractedData?.witnesses?.were_present === true || collectedData?.witnesses_present === true)
-               && (!extractedData?.witnesses?.witness_data?.length && !collectedData?.witness_data)) {
-        missing.critical.push({ id: 'witness_data', label: 'Dane świadka (imię, nazwisko, adres)' });
+    } else if (witnessPresent === true) {
+        // Check if we have witness data
+        const hasWitnessData = (extractedData?.witnesses?.witness_data?.length > 0)
+            || (extractedData?.swiadkowie?.length > 0 && extractedData.swiadkowie.some(s => s.imie_nazwisko))
+            || collectedData?.witness_data;
+
+        if (!hasWitnessData) {
+            missing.critical.push({ id: 'witness_data', label: 'Dane świadka (imię, nazwisko)' });
+        } else {
+            // Check if we have witness address
+            const hasWitnessAddress = (extractedData?.swiadkowie?.length > 0 && extractedData.swiadkowie.some(s => s.adres))
+                || collectedData?.witness_address;
+            if (!hasWitnessAddress) {
+                missing.recommended.push({ id: 'witness_address', label: 'Adres świadka' });
+            }
+        }
     }
 
     // Work context
@@ -261,7 +390,7 @@ Odpowiedz TYLKO w formacie JSON:
 {
   "initial_summary": "Krótkie (2-3 zdania) podsumowanie tego, co już wiesz o wypadku. Wymień konkretne fakty.",
   "first_question": "Jedno konkretne pytanie o pierwszą brakującą informację. Pytanie powinno być jasne i łatwe do odpowiedzenia.",
-  "question_id": "ID pytania z listy: accident_date|accident_time|accident_place|circumstances|cause|injury_description|body_parts|medical_facility|medical_docs|witness_presence|witness_data|task_performed|additional_info",
+  "question_id": "ID pytania z listy: accident_date|accident_time|accident_place|circumstances|cause|injury_description|body_parts|medical_facility|adres_placowki|medical_docs|witness_presence|witness_data|witness_address|task_performed|additional_info|data_urodzenia|dokument_tozsamosci|adres_zamieszkania|pierwsza_pomoc_udzielono|pierwsza_pomoc_kto|czy_hospitalizowany",
   "missing_critical": ["lista POLSKICH nazw brakujących krytycznych informacji"],
   "missing_recommended": ["lista POLSKICH nazw brakujących zalecanych informacji"]
 }`;
@@ -338,25 +467,71 @@ function fallbackQuestions(extractedData, missingInfo = null) {
                 firstQuestion = 'Proszę opisać jakich obrażeń doznałeś/aś w wyniku wypadku.';
                 break;
             case 'medical_facility':
-                firstQuestion = 'W jakiej placówce medycznej udzielono Ci pomocy? Podaj nazwę i adres (np. SOR Szpitala X, ul. Y).';
+                firstQuestion = 'W jakiej placówce medycznej udzielono Ci pomocy? Podaj nazwę (np. SOR Szpitala X).';
+                break;
+            case 'adres_placowki':
+                firstQuestion = 'Proszę podać adres placówki medycznej, w której udzielono Ci pomocy.';
                 break;
             case 'witness_presence':
                 firstQuestion = 'Czy w momencie wypadku był obecny jakiś świadek zdarzenia?';
                 break;
             case 'witness_data':
-                firstQuestion = 'Proszę podać dane świadka wypadku: imię, nazwisko oraz adres zamieszkania.';
+                firstQuestion = 'Proszę podać imię i nazwisko świadka wypadku.';
+                break;
+            case 'witness_address':
+                firstQuestion = 'Proszę podać adres zamieszkania świadka.';
+                break;
+            case 'adres_zamieszkania':
+                firstQuestion = 'Proszę podać swój adres zamieszkania (ulica, numer, kod pocztowy, miasto).';
+                break;
+            case 'czy_hospitalizowany':
+                firstQuestion = 'Czy po wypadku byłeś/aś hospitalizowany/a (przyjęty/a do szpitala na oddział)?';
                 break;
             default:
                 firstQuestion = `Proszę uzupełnić informację: ${firstMissing.label}`;
+        }
+    } else if (missingInfo.recommended.length > 0) {
+        // If no critical missing, ask about recommended
+        const firstRecommended = missingInfo.recommended[0];
+        questionId = firstRecommended.id;
+
+        switch (firstRecommended.id) {
+            case 'accident_time':
+                firstQuestion = 'O której godzinie doszło do wypadku (w przybliżeniu)?';
+                break;
+            case 'body_parts':
+                firstQuestion = 'Które części ciała zostały uszkodzone w wyniku wypadku?';
+                break;
+            case 'task_performed':
+                firstQuestion = 'Jaką dokładnie czynność wykonywałeś/aś w momencie wypadku?';
+                break;
+            case 'data_urodzenia':
+                firstQuestion = 'Proszę podać datę urodzenia (dzień, miesiąc, rok).';
+                break;
+            case 'dokument_tozsamosci':
+                firstQuestion = 'Proszę podać numer i rodzaj dokumentu tożsamości (np. dowód osobisty ABC123456).';
+                break;
+            case 'pierwsza_pomoc_udzielono':
+                firstQuestion = 'Czy bezpośrednio po wypadku udzielono Ci pierwszej pomocy?';
+                break;
+            case 'pierwsza_pomoc_kto':
+                firstQuestion = 'Kto udzielił Ci pierwszej pomocy? (np. współpracownik, ratownik medyczny)';
+                break;
+            default:
+                firstQuestion = `Proszę uzupełnić dodatkową informację: ${firstRecommended.label}`;
         }
     }
 
     // Build summary based on what we know
     const facts = [];
-    if (extractedData?.accident?.date) facts.push(`data: ${extractedData.accident.date}`);
-    if (extractedData?.accident?.time) facts.push(`godzina: ${extractedData.accident.time}`);
-    if (extractedData?.accident?.place) facts.push(`miejsce: ${extractedData.accident.place}`);
-    if (extractedData?.injury?.description) facts.push(`uraz: ${extractedData.injury.description}`);
+    if (extractedData?.accident?.date || extractedData?.wypadek?.data)
+        facts.push(`data: ${extractedData?.accident?.date || extractedData?.wypadek?.data}`);
+    if (extractedData?.accident?.time || extractedData?.wypadek?.godzina)
+        facts.push(`godzina: ${extractedData?.accident?.time || extractedData?.wypadek?.godzina}`);
+    if (extractedData?.accident?.place || extractedData?.wypadek?.miejsce)
+        facts.push(`miejsce: ${extractedData?.accident?.place || extractedData?.wypadek?.miejsce}`);
+    if (extractedData?.injury?.description || extractedData?.urazy?.opis)
+        facts.push(`uraz: ${extractedData?.injury?.description || extractedData?.urazy?.opis}`);
 
     const summary = facts.length > 0
         ? `Dziękuję za zgłoszenie. Z opisu wynika: ${facts.join(', ')}. Muszę zebrać kilka dodatkowych informacji wymaganych przez ZUS.`
@@ -388,21 +563,29 @@ ZADANIE:
 Odpowiedz TYLKO w formacie JSON:
 {
   "extracted_info": {
-    "accident_date": "data jeśli podana (YYYY-MM-DD) lub null",
-    "accident_time": "godzina jeśli podana (HH:MM) lub null",
-    "accident_place": "miejsce jeśli podane lub null",
-    "cause": "przyczyna jeśli podana lub null",
+    "accident_date": "data wypadku jeśli podana (YYYY-MM-DD) lub null",
+    "accident_time": "godzina wypadku jeśli podana (HH:MM) lub null",
+    "accident_place": "miejsce wypadku jeśli podane lub null",
+    "cause": "przyczyna wypadku jeśli podana lub null",
     "injury_description": "opis urazu jeśli podany lub null",
     "body_parts": ["części ciała jeśli podane"] lub null,
-    "medical_facility": "placówka medyczna jeśli podana lub null",
+    "medical_facility": "nazwa placówki medycznej jeśli podana lub null",
+    "adres_placowki": "adres placówki medycznej jeśli podany lub null",
     "has_medical_docs": true/false/null,
     "witnesses_present": true/false/null,
-    "witness_data": "dane świadka jeśli podane lub null",
+    "witness_data": "imię i nazwisko świadka jeśli podane lub null",
+    "witness_address": "adres świadka jeśli podany lub null",
     "task_performed": "czynność wykonywana jeśli podana lub null",
+    "data_urodzenia": "data urodzenia jeśli podana (YYYY-MM-DD) lub null",
+    "dokument_tozsamosci": "numer i rodzaj dokumentu tożsamości jeśli podany lub null",
+    "adres_zamieszkania": "adres zamieszkania poszkodowanego jeśli podany lub null",
+    "pierwsza_pomoc_udzielono": true/false/null,
+    "pierwsza_pomoc_kto": "kto udzielił pierwszej pomocy jeśli podane lub null",
+    "czy_hospitalizowany": true/false/null,
     "additional_facts": ["inne istotne fakty z odpowiedzi"]
   },
   "assistant_reply": "Naturalna, pomocna odpowiedź po polsku. Potwierdź co zanotowałeś i zadaj następne pytanie.",
-  "next_question_id": "ID następnego pytania lub null jeśli zebrano wszystko",
+  "next_question_id": "ID następnego pytania z listy: accident_date|accident_time|accident_place|circumstances|cause|injury_description|body_parts|medical_facility|adres_placowki|medical_docs|witness_presence|witness_data|witness_address|task_performed|additional_info|data_urodzenia|dokument_tozsamosci|adres_zamieszkania|pierwsza_pomoc_udzielono|pierwsza_pomoc_kto|czy_hospitalizowany lub null jeśli zebrano wszystko",
   "data_complete": false
 }
 
@@ -460,11 +643,20 @@ function getQuestionText(questionId) {
         'injury_description': 'Jakich obrażeń doznałeś/aś?',
         'body_parts': 'Które części ciała zostały uszkodzone?',
         'medical_facility': 'W jakiej placówce medycznej udzielono pomocy?',
+        'adres_placowki': 'Proszę podać adres placówki medycznej.',
         'medical_docs': 'Czy posiadasz dokumentację medyczną?',
         'witness_presence': 'Czy był świadek wypadku?',
-        'witness_data': 'Proszę podać dane świadka.',
+        'witness_data': 'Proszę podać dane świadka (imię i nazwisko).',
+        'witness_address': 'Proszę podać adres świadka.',
         'task_performed': 'Jaką czynność wykonywałeś w momencie wypadku?',
-        'additional_info': 'Czy jest coś jeszcze do dodania?'
+        'additional_info': 'Czy jest coś jeszcze do dodania?',
+        // New questions for expanded Polish structure
+        'data_urodzenia': 'Proszę podać datę urodzenia.',
+        'dokument_tozsamosci': 'Proszę podać numer i rodzaj dokumentu tożsamości (np. dowód osobisty).',
+        'adres_zamieszkania': 'Proszę podać adres zamieszkania.',
+        'pierwsza_pomoc_udzielono': 'Czy bezpośrednio po wypadku udzielono Ci pierwszej pomocy?',
+        'pierwsza_pomoc_kto': 'Kto udzielił Ci pierwszej pomocy? (np. współpracownik, ratownik)',
+        'czy_hospitalizowany': 'Czy byłeś/aś hospitalizowany/a po wypadku?'
     };
     return questions[questionId] || questionId;
 }
@@ -485,19 +677,36 @@ function transformAIResponse(aiResponse) {
             cause: extracted.cause || null,
             injury_description: extracted.injury_description || null,
             body_parts: extracted.body_parts || null,
-            witness_name: extracted.witness_data || null,
-            witness_address: null,
-            medical_facility_name: extracted.medical_facility || null,
-            medical_facility_address: null,
+            witness_name: extracted.witness_data || extracted.witness_name || null,
+            witness_address: extracted.witness_address || null,
+            medical_facility_name: extracted.medical_facility || extracted.nazwa_placowki || null,
+            medical_facility_address: extracted.adres_placowki || null,
             has_medical_docs: extracted.has_medical_docs,
             task_performed: extracted.task_performed || null,
-            additional_facts: extracted.additional_facts || []
+            additional_facts: extracted.additional_facts || [],
+            // New Polish fields
+            data_urodzenia: extracted.data_urodzenia || null,
+            dokument_tozsamosci: extracted.dokument_tozsamosci || null,
+            adres_zamieszkania: extracted.adres_zamieszkania || null,
+            pierwsza_pomoc_udzielono: extracted.pierwsza_pomoc_udzielono ?? extracted.pierwsza_pomoc?.udzielono ?? null,
+            pierwsza_pomoc_kto: extracted.pierwsza_pomoc_kto || extracted.pierwsza_pomoc?.kto_udzielil || null,
+            czy_hospitalizowany: extracted.czy_hospitalizowany ?? extracted.hospitalizacja?.czy_hospitalizowany ?? null,
+            nazwa_placowki: extracted.nazwa_placowki || extracted.hospitalizacja?.nazwa_placowki || null,
+            adres_placowki: extracted.adres_placowki || extracted.hospitalizacja?.adres_placowki || null
         },
         assistant_reply: aiResponse.assistant_reply || 'Dziękuję za informację.',
         next_question_id: aiResponse.next_question_id || null,
         case_updates: {
             witnesses_present: extracted.witnesses_present,
-            has_medical_docs: extracted.has_medical_docs
+            has_medical_docs: extracted.has_medical_docs,
+            adres_zamieszkania: extracted.adres_zamieszkania || null,
+            data_urodzenia: extracted.data_urodzenia || null,
+            dokument_tozsamosci: extracted.dokument_tozsamosci || null,
+            pierwsza_pomoc_udzielono: extracted.pierwsza_pomoc_udzielono ?? null,
+            pierwsza_pomoc_kto: extracted.pierwsza_pomoc_kto || null,
+            czy_hospitalizowany: extracted.czy_hospitalizowany ?? null,
+            nazwa_placowki: extracted.nazwa_placowki || null,
+            adres_placowki: extracted.adres_placowki || null
         },
         data_complete: aiResponse.data_complete || false
     };
@@ -525,85 +734,166 @@ function fallbackParseResponse(message, questionId, extractedData, collectedData
         medical_facility_address: null,
         has_medical_docs: null,
         task_performed: null,
-        additional_facts: []
+        additional_facts: [],
+        // New fields for Polish structure
+        data_urodzenia: null,
+        dokument_tozsamosci: null,
+        adres_zamieszkania: null,
+        pierwsza_pomoc_udzielono: null,
+        pierwsza_pomoc_kto: null,
+        czy_hospitalizowany: null,
+        nazwa_placowki: null,
+        adres_placowki: null
     };
     const case_updates = {};
 
-    // Determine what's still missing after this answer
-    const updatedCollected = { ...collectedData };
+    // Helper to get next missing question
+    const getNextQuestion = (updatedCollected) => {
+        const missingInfo = determineMissingInfo(extractedData, { ...collectedData, ...updatedCollected });
+        if (missingInfo.critical.length > 0) {
+            return missingInfo.critical[0].id;
+        } else if (missingInfo.recommended.length > 0) {
+            return missingInfo.recommended[0].id;
+        }
+        return 'additional_info';
+    };
 
     switch (questionId) {
         case 'confirm_description':
             // Check what's missing and ask the first missing thing
-            if (extractedData?.witnesses?.were_present === null) {
-                assistantReply = 'Dziękuję za potwierdzenie. Czy w momencie wypadku był obecny jakiś świadek zdarzenia?';
-                nextQuestionId = 'witness_presence';
-            } else if (!extractedData?.injury?.medical_facility && !collectedData?.medical_facility) {
-                assistantReply = 'Dziękuję. W jakiej placówce medycznej udzielono Ci pierwszej pomocy? Podaj nazwę i adres.';
-                nextQuestionId = 'medical_facility';
+            nextQuestionId = getNextQuestion({});
+            if (nextQuestionId === 'additional_info') {
+                assistantReply = 'Dziękuję za potwierdzenie. Zebrane informacje są kompletne. Czy jest coś jeszcze, co chciałbyś dodać?';
             } else {
-                assistantReply = 'Dziękuję. Czy jest coś jeszcze, co chciałbyś dodać do zgłoszenia?';
-                nextQuestionId = 'additional_info';
+                assistantReply = `Dziękuję za potwierdzenie. ${getQuestionText(nextQuestionId)}`;
+            }
+            break;
+
+        case 'adres_zamieszkania':
+            extracted_info.adres_zamieszkania = message.trim();
+            extracted_info.additional_facts.push(`Adres zamieszkania: ${message}`);
+            case_updates.adres_zamieszkania = message.trim();
+            nextQuestionId = getNextQuestion({ adres_zamieszkania: message.trim() });
+            assistantReply = `Dziękuję, zanotowałem adres zamieszkania. ${getQuestionText(nextQuestionId)}`;
+            break;
+
+        case 'data_urodzenia':
+            extracted_info.data_urodzenia = message.trim();
+            case_updates.data_urodzenia = message.trim();
+            nextQuestionId = getNextQuestion({ data_urodzenia: message.trim() });
+            assistantReply = `Dziękuję, zanotowałem datę urodzenia. ${getQuestionText(nextQuestionId)}`;
+            break;
+
+        case 'dokument_tozsamosci':
+            extracted_info.dokument_tozsamosci = message.trim();
+            case_updates.dokument_tozsamosci = message.trim();
+            nextQuestionId = getNextQuestion({ dokument_tozsamosci: message.trim() });
+            assistantReply = `Dziękuję, zanotowałem dane dokumentu tożsamości. ${getQuestionText(nextQuestionId)}`;
+            break;
+
+        case 'pierwsza_pomoc_udzielono':
+            if (lowerMessage.includes('tak') || lowerMessage.includes('udziel')) {
+                extracted_info.pierwsza_pomoc_udzielono = true;
+                case_updates.pierwsza_pomoc_udzielono = true;
+                nextQuestionId = 'pierwsza_pomoc_kto';
+                assistantReply = 'Rozumiem, że udzielono pierwszej pomocy. Kto udzielił Ci pierwszej pomocy? (np. współpracownik, ratownik medyczny)';
+            } else {
+                extracted_info.pierwsza_pomoc_udzielono = false;
+                case_updates.pierwsza_pomoc_udzielono = false;
+                nextQuestionId = getNextQuestion({ pierwsza_pomoc_udzielono: false });
+                assistantReply = `Zanotowałem, że nie udzielono pierwszej pomocy. ${getQuestionText(nextQuestionId)}`;
+            }
+            break;
+
+        case 'pierwsza_pomoc_kto':
+            extracted_info.pierwsza_pomoc_kto = message.trim();
+            case_updates.pierwsza_pomoc_kto = message.trim();
+            nextQuestionId = getNextQuestion({ pierwsza_pomoc_kto: message.trim() });
+            assistantReply = `Dziękuję, zanotowałem informację o osobie udzielającej pierwszej pomocy. ${getQuestionText(nextQuestionId)}`;
+            break;
+
+        case 'czy_hospitalizowany':
+            if (lowerMessage.includes('tak') || lowerMessage.includes('był') || lowerMessage.includes('szpital')) {
+                extracted_info.czy_hospitalizowany = true;
+                case_updates.czy_hospitalizowany = true;
+                nextQuestionId = 'medical_facility';
+                assistantReply = 'Rozumiem, że byłeś/aś hospitalizowany/a. W jakiej placówce medycznej? Podaj nazwę szpitala.';
+            } else {
+                extracted_info.czy_hospitalizowany = false;
+                case_updates.czy_hospitalizowany = false;
+                nextQuestionId = getNextQuestion({ czy_hospitalizowany: false });
+                assistantReply = `Zanotowałem, że nie było hospitalizacji. ${getQuestionText(nextQuestionId)}`;
             }
             break;
 
         case 'witness_presence':
             if (lowerMessage.includes('tak') || lowerMessage.includes('był') || lowerMessage.includes('świadek') || lowerMessage.includes('obecn')) {
-                assistantReply = 'Rozumiem, że był świadek zdarzenia. Proszę podać dane świadka: imię, nazwisko oraz adres zamieszkania. Te informacje są wymagane w dokumentacji ZUS.';
+                assistantReply = 'Rozumiem, że był świadek zdarzenia. Proszę podać imię i nazwisko świadka.';
                 nextQuestionId = 'witness_data';
                 case_updates.witnesses_present = true;
             } else {
-                assistantReply = 'Zanotowałem, że nie było świadków zdarzenia. W jakiej placówce medycznej udzielono Ci pierwszej pomocy? Podaj proszę nazwę i adres.';
-                nextQuestionId = 'medical_facility';
+                assistantReply = 'Zanotowałem, że nie było świadków zdarzenia. ';
                 case_updates.witnesses_present = false;
+                nextQuestionId = getNextQuestion({ witnesses_present: false });
+                assistantReply += getQuestionText(nextQuestionId);
             }
             break;
 
         case 'witness_data':
             extracted_info.witness_name = message.trim();
             extracted_info.additional_facts.push(`Świadek: ${message}`);
-            assistantReply = 'Dziękuję, zanotowałem dane świadka. W jakiej placówce medycznej udzielono Ci pierwszej pomocy? Podaj proszę nazwę i adres.';
-            nextQuestionId = 'medical_facility';
+            case_updates.witness_data = message.trim();
+            nextQuestionId = 'witness_address';
+            assistantReply = 'Dziękuję. Proszę teraz podać adres zamieszkania świadka.';
+            break;
+
+        case 'witness_address':
+            extracted_info.witness_address = message.trim();
+            extracted_info.additional_facts.push(`Adres świadka: ${message}`);
+            case_updates.witness_address = message.trim();
+            nextQuestionId = getNextQuestion({ witness_address: message.trim() });
+            assistantReply = `Dziękuję, zanotowałem adres świadka. ${getQuestionText(nextQuestionId)}`;
             break;
 
         case 'medical_facility':
             extracted_info.medical_facility_name = message.trim();
+            extracted_info.nazwa_placowki = message.trim();
             extracted_info.additional_facts.push(`Placówka medyczna: ${message}`);
-            assistantReply = 'Dziękuję za informację o placówce medycznej. Czy posiadasz dokumentację medyczną z tej wizyty (np. kartę informacyjną z SOR, zaświadczenie lekarskie)?';
+            case_updates.medical_facility = message.trim();
+            case_updates.nazwa_placowki = message.trim();
+            nextQuestionId = 'adres_placowki';
+            assistantReply = 'Dziękuję za informację o placówce medycznej. Proszę podać adres tej placówki.';
+            break;
+
+        case 'adres_placowki':
+            extracted_info.medical_facility_address = message.trim();
+            extracted_info.adres_placowki = message.trim();
+            extracted_info.additional_facts.push(`Adres placówki: ${message}`);
+            case_updates.adres_placowki = message.trim();
             nextQuestionId = 'medical_docs';
+            assistantReply = 'Dziękuję. Czy posiadasz dokumentację medyczną z tej wizyty (np. kartę informacyjną z SOR, zaświadczenie lekarskie)?';
             break;
 
         case 'medical_docs':
             if (lowerMessage.includes('tak') || lowerMessage.includes('mam') || lowerMessage.includes('posiadam')) {
                 extracted_info.has_medical_docs = true;
                 case_updates.has_medical_docs = true;
-                // Check if we need task_performed
-                if (!extractedData?.work_context?.task_performed && !collectedData?.task_performed) {
-                    assistantReply = 'Świetnie, dokumentacja medyczna jest bardzo ważna. Proszę opisać, jaką dokładnie czynność wykonywałeś/aś w momencie wypadku.';
-                    nextQuestionId = 'task_performed';
-                } else {
-                    assistantReply = 'Świetnie! Zebrałem wszystkie niezbędne informacje. Możesz przejrzeć wygenerowane dokumenty w panelu po prawej stronie. Czy jest coś jeszcze, co chciałbyś dodać?';
-                    nextQuestionId = 'additional_info';
-                }
+                nextQuestionId = getNextQuestion({ has_medical_docs: true });
+                assistantReply = `Świetnie, dokumentacja medyczna jest bardzo ważna. ${getQuestionText(nextQuestionId)}`;
             } else {
                 extracted_info.has_medical_docs = false;
                 case_updates.has_medical_docs = false;
-                assistantReply = 'Rozumiem. Zalecam uzyskanie dokumentacji medycznej - jest istotna dla ZUS. ';
-                if (!extractedData?.work_context?.task_performed && !collectedData?.task_performed) {
-                    assistantReply += 'Proszę opisać, jaką dokładnie czynność wykonywałeś/aś w momencie wypadku.';
-                    nextQuestionId = 'task_performed';
-                } else {
-                    assistantReply += 'Czy jest coś jeszcze, co chciałbyś dodać do zgłoszenia?';
-                    nextQuestionId = 'additional_info';
-                }
+                nextQuestionId = getNextQuestion({ has_medical_docs: false });
+                assistantReply = `Rozumiem. Zalecam uzyskanie dokumentacji medycznej - jest istotna dla ZUS. ${getQuestionText(nextQuestionId)}`;
             }
             break;
 
         case 'task_performed':
             extracted_info.task_performed = message.trim();
             extracted_info.additional_facts.push(`Wykonywana czynność: ${message}`);
-            assistantReply = 'Dziękuję, zanotowałem. Zebrałem wszystkie podstawowe informacje. Możesz przejrzeć wygenerowane dokumenty w panelu po prawej stronie. Czy jest coś jeszcze, co chciałbyś dodać?';
-            nextQuestionId = 'additional_info';
+            case_updates.task_performed = message.trim();
+            nextQuestionId = getNextQuestion({ task_performed: message.trim() });
+            assistantReply = `Dziękuję, zanotowałem. ${getQuestionText(nextQuestionId)}`;
             break;
 
         case 'additional_info':
@@ -623,50 +913,52 @@ function fallbackParseResponse(message, questionId, extractedData, collectedData
             if (dateMatch) {
                 extracted_info.accident_date = `${dateMatch[3]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[1].padStart(2, '0')}`;
             }
-            assistantReply = 'Dziękuję, zanotowałem datę. ';
-            // Next missing item
-            if (!extractedData?.accident?.place) {
-                assistantReply += 'Proszę podać dokładne miejsce, gdzie doszło do wypadku.';
-                nextQuestionId = 'accident_place';
-            } else if (extractedData?.witnesses?.were_present === null) {
-                assistantReply += 'Czy w momencie wypadku był obecny jakiś świadek?';
-                nextQuestionId = 'witness_presence';
-            } else {
-                nextQuestionId = 'medical_facility';
-                assistantReply += 'W jakiej placówce medycznej udzielono Ci pomocy?';
+            nextQuestionId = getNextQuestion({});
+            assistantReply = `Dziękuję, zanotowałem datę. ${getQuestionText(nextQuestionId)}`;
+            break;
+
+        case 'accident_time':
+            const timeMatch = message.match(/(\d{1,2})[:\.](\d{2})/);
+            if (timeMatch) {
+                extracted_info.accident_time = `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
             }
+            nextQuestionId = getNextQuestion({});
+            assistantReply = `Dziękuję, zanotowałem godzinę. ${getQuestionText(nextQuestionId)}`;
             break;
 
         case 'accident_place':
             extracted_info.accident_place = message.trim();
-            assistantReply = 'Zanotowałem miejsce wypadku. ';
-            if (extractedData?.witnesses?.were_present === null) {
-                assistantReply += 'Czy w momencie wypadku był obecny jakiś świadek?';
-                nextQuestionId = 'witness_presence';
-            } else {
-                assistantReply += 'W jakiej placówce medycznej udzielono Ci pomocy?';
-                nextQuestionId = 'medical_facility';
-            }
+            nextQuestionId = getNextQuestion({});
+            assistantReply = `Zanotowałem miejsce wypadku. ${getQuestionText(nextQuestionId)}`;
             break;
 
         case 'injury_description':
             extracted_info.injury_description = message.trim();
-            assistantReply = 'Dziękuję za opis obrażeń. ';
-            if (!collectedData?.medical_facility && !extractedData?.injury?.medical_facility) {
-                assistantReply += 'W jakiej placówce medycznej udzielono Ci pomocy? Podaj nazwę i adres.';
-                nextQuestionId = 'medical_facility';
-            } else if (extractedData?.witnesses?.were_present === null) {
-                assistantReply += 'Czy w momencie wypadku był obecny jakiś świadek?';
-                nextQuestionId = 'witness_presence';
-            } else {
-                assistantReply += 'Czy jest coś jeszcze, co chciałbyś dodać?';
-                nextQuestionId = 'additional_info';
-            }
+            nextQuestionId = getNextQuestion({});
+            assistantReply = `Dziękuję za opis obrażeń. ${getQuestionText(nextQuestionId)}`;
+            break;
+
+        case 'body_parts':
+            extracted_info.body_parts = message.split(/[,;]/).map(p => p.trim()).filter(p => p);
+            nextQuestionId = getNextQuestion({});
+            assistantReply = `Dziękuję, zanotowałem uszkodzone części ciała. ${getQuestionText(nextQuestionId)}`;
+            break;
+
+        case 'cause':
+            extracted_info.cause = message.trim();
+            nextQuestionId = getNextQuestion({});
+            assistantReply = `Dziękuję, zanotowałem przyczynę wypadku. ${getQuestionText(nextQuestionId)}`;
+            break;
+
+        case 'circumstances':
+            extracted_info.additional_facts.push(`Okoliczności: ${message}`);
+            nextQuestionId = getNextQuestion({});
+            assistantReply = `Dziękuję za opis okoliczności. ${getQuestionText(nextQuestionId)}`;
             break;
 
         default:
-            assistantReply = 'Dziękuję za informację. Czy jest coś jeszcze, co chciałbyś dodać do zgłoszenia?';
-            nextQuestionId = 'additional_info';
+            nextQuestionId = getNextQuestion({});
+            assistantReply = `Dziękuję za informację. ${getQuestionText(nextQuestionId)}`;
     }
 
     return {
