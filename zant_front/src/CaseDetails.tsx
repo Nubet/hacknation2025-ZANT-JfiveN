@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ZantHeader from './ZantHeader';
 import { api, ApiError } from './apiClient';
 import type {
@@ -7,6 +7,7 @@ import type {
     DocumentsPreviewResponse,
     ChatMessage
 } from './apiClient';
+import type { EmployeeCaseData } from './types/caseTypes';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -45,6 +46,7 @@ interface Document {
 
 const CaseDetails: React.FC = () => {
     const location = useLocation();
+    const navigate = useNavigate();
 
     // Extract caseId from URL path (handles slashes in caseId like ZANT/2025/000123)
     const extractCaseIdFromPath = (): string => {
@@ -366,6 +368,45 @@ const CaseDetails: React.FC = () => {
         }
     };
 
+    // Handle submit to employee panel
+    const handleSubmitToEmployee = () => {
+        console.log('[CaseDetails] Submitting case to employee panel');
+
+        const caseData: EmployeeCaseData = {
+            caseId,
+            createdAt: locationState?.createdAt,
+            progress,
+            definitions: definitions.map(d => ({
+                title: d.title,
+                status: d.status,
+                note: d.note
+            })),
+            requiredInfos: requiredInfos.map(r => ({
+                text: r.text,
+                type: r.type
+            })),
+            documentsToPrep: documentsToPrep.map(d => ({
+                text: d.text,
+                type: d.type
+            })),
+            documents: documents.map(d => ({
+                id: d.id,
+                title: d.title,
+                meta: d.meta,
+                preview: d.preview
+            })),
+            chatHistory: messages.map(m => ({
+                id: m.id,
+                type: m.type,
+                content: m.content,
+                timestamp: m.timestamp
+            })),
+            submittedAt: new Date().toISOString()
+        };
+
+        navigate('/employee', { state: { caseData } });
+    };
+
 
     const getStatusClass = (status: string) => {
         switch (status) {
@@ -632,6 +673,30 @@ const CaseDetails: React.FC = () => {
                         </div>
                     </section>
                 )}
+
+                {/* Submit to Employee Panel Button */}
+                <section className="bg-bg-panel p-5 shadow-[0_1px_3px_rgba(0,0,0,0.12)] border border-border-light flex flex-col gap-[15px] mt-[10px]">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <div className="text-[1.1rem] font-semibold text-primary-main">Gotowe do weryfikacji?</div>
+                            <div className="text-[0.85rem] text-text-muted mt-1">
+                                Po uzupełnieniu wszystkich informacji możesz przesłać sprawę do panelu pracownika ZUS w celu weryfikacji.
+                            </div>
+                        </div>
+                        <button
+                            className="rounded border-none bg-primary-main text-white py-3 px-8 text-base font-bold cursor-pointer hover:bg-primary-dark transition-colors duration-200 shadow-md"
+                            onClick={handleSubmitToEmployee}
+                            disabled={progress < 50}
+                        >
+                            Prześlij do weryfikacji
+                        </button>
+                    </div>
+                    {progress < 50 && (
+                        <div className="text-[0.8rem] text-status-warning">
+                            Uzupełnij więcej informacji aby móc przesłać sprawę (wymagane minimum 50% postępu).
+                        </div>
+                    )}
+                </section>
             </div>
         </div>
     );
